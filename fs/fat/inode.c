@@ -144,7 +144,7 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	}
 
         /* 
-         * SFX_RCROBLES: Come back and add check for SFX indoe... is so, then
+         * SEFT_RCROBLES: Come back and add check for SEFT indoe... is so, then
          * must clear the blocks (initialized) before they are put in tree so 
          * that it's not found by another thread before it's initialized. 
          */
@@ -158,12 +158,6 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
 	if (err)
 		return err;
-
-        /* 
-         * SFX_RCROBLES: Come back and add check for SFX indoe... is so, then
-         * must clear the blocks (initialized) before they are put in tree so 
-         * that it's not found by another thread before it's initialized. 
-         */
 
 	BUG_ON(!phys);
 	BUG_ON(*max_blocks != mapped_blocks);
@@ -503,12 +497,11 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 	}
 
-        /*
-         * SFX_RCROBLES: Set i_flgs in inode to include S_SFX... how do 
-         * we determine if S_SFX should be set? In ext2/3/4, there is a 
-         * super block flag that is set... test_opt(inode->i_sb, XIP) 
-         * Do we need a similar flag for the FAT super block???
-         */
+        /* Set i_flgs in inode to include S_SEFT based on sb mount option */
+        if (sbi->options.seft)
+            inode->i_flags |= S_SEFT;
+        else
+            inode->i_flags &= ~S_SEFT;
 
 	if (de->attr & ATTR_SYS) {
 		if (sbi->options.sys_immutable)
@@ -956,6 +949,7 @@ enum {
 	Opt_obsolete, Opt_flush, Opt_tz_utc, Opt_rodir, Opt_err_cont,
 	Opt_err_panic, Opt_err_ro, Opt_discard, Opt_nfs, Opt_time_offset,
 	Opt_nfs_stale_rw, Opt_nfs_nostale_ro, Opt_err, Opt_dos1xfloppy,
+        Opt_seftenable,
 };
 
 static const match_table_t fat_tokens = {
@@ -1071,6 +1065,10 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	opts->tz_set = 0;
 	opts->nfs = 0;
 	opts->errors = FAT_ERRORS_RO;
+#ifdef CONFIG_FS_SEFT
+        /* Turn on SEFT by default when mounting */
+        opts->seft = 1;
+#endif
 	*debug = 0;
 
 	if (!options)
@@ -1252,6 +1250,12 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 		case Opt_discard:
 			opts->discard = 1;
 			break;
+
+                /* Uncomment to allow enabling SEFT via FAT mount options */
+                /*case Opt_seftenable:
+                        opts->seft = 1;
+                        break;
+                */
 
 		/* obsolete mount options */
 		case Opt_obsolete:

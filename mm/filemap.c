@@ -1749,12 +1749,12 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 		 * the rest of the read.  Buffered reads will not work for
 		 * DAX files, so don't bother trying.
                  *
-                 * SFX_RCROBLES: Buffered reads won't work for SFX files
+                 * SEFT_RCROBLES: Buffered reads won't work for SEFT files
 		 */
 //		if (retval < 0 || !iov_iter_count(iter) || *ppos >= size ||
 //		    IS_DAX(inode)) {
 		if (retval < 0 || !iov_iter_count(iter) || *ppos >= size ||
-                    IS_DAX(inode) || IS_SFX(inode)) {
+                    IS_DAX(inode) || IS_SEFT(inode)) {
 			file_accessed(file);
 			goto out;
 		}
@@ -2587,12 +2587,12 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 		 * not succeed (even if it did, DAX does not handle dirty
 		 * page-cache pages correctly).
                  * 
-                 * SFX_RCROBLES: Do not fall back to buffered write for writes 
+                 * SEFT_RCROBLES: Do not fall back to buffered write for writes 
                  * that stopped short of completing. 
 		 */
 //		if (written < 0 || !iov_iter_count(from) || IS_DAX(inode))
 		if (written < 0 || !iov_iter_count(from) || IS_DAX(inode) ||
-                    IS_SFX(inode)) {
+                    IS_SEFT(inode)) {
 			goto out;
                 }
 

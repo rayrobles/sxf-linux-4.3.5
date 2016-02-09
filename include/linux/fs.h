@@ -73,7 +73,7 @@ typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 			ssize_t bytes, void *private);
 typedef void (dax_iodone_t)(struct buffer_head *bh_map, int uptodate);
 
-#define CONFIG_FS_SFX           1
+#define CONFIG_FS_SEFT          1
 
 #define MAY_EXEC		0x00000001
 #define MAY_WRITE		0x00000002
@@ -1753,10 +1753,10 @@ struct super_operations {
 #else
 #define S_DAX		0	/* Make all the DAX code disappear */
 #endif
-#ifdef CONFIG_FS_SFX
-#define S_SFX           16384   /* SCM FAT Extensions */
+#ifdef CONFIG_FS_SEFT
+#define S_SEFT           16384   /* SCM Extensions for FAT... no page cache */
 #else
-#define S_SFX           0       /* Disable SFX */
+#define S_SEFT           0       /* Disable SEFT */
 #endif
 
 /*
@@ -1796,7 +1796,7 @@ struct super_operations {
 #define IS_AUTOMOUNT(inode)	((inode)->i_flags & S_AUTOMOUNT)
 #define IS_NOSEC(inode)		((inode)->i_flags & S_NOSEC)
 #define IS_DAX(inode)		((inode)->i_flags & S_DAX)
-#define IS_SFX(inode)		((inode)->i_flags & S_SFX)
+#define IS_SEFT(inode)		((inode)->i_flags & S_SEFT)
 
 #define IS_WHITEOUT(inode)	(S_ISCHR(inode->i_mode) && \
 				 (inode)->i_rdev == WHITEOUT_DEV)
@@ -2878,7 +2878,7 @@ static inline bool io_is_direct(struct file *filp)
 	//return (filp->f_flags & O_DIRECT) || IS_DAX(file_inode(filp));
 	return (filp->f_flags & O_DIRECT)   || 
                 IS_DAX(file_inode(filp))    ||
-                IS_SFX(file_inode(filp));
+                IS_SEFT(file_inode(filp));
 }
 
 static inline int iocb_flags(struct file *file)
