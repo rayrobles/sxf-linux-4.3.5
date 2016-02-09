@@ -138,10 +138,17 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	offset = (unsigned long)iblock & (sbi->sec_per_clus - 1);
 	if (!offset) {
 		/* TODO: multiple cluster allocation would be desirable. */
-		err = fat_add_cluster(inode);
+		err = fat_add_cluster(inode); 
 		if (err)
 			return err;
 	}
+
+        /* 
+         * SFX_RCROBLES: Come back and add check for SFX indoe... is so, then
+         * must clear the blocks (initialized) before they are put in tree so 
+         * that it's not found by another thread before it's initialized. 
+         */
+
 	/* available blocks on this cluster */
 	mapped_blocks = sbi->sec_per_clus - offset;
 
@@ -151,6 +158,12 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
 	if (err)
 		return err;
+
+        /* 
+         * SFX_RCROBLES: Come back and add check for SFX indoe... is so, then
+         * must clear the blocks (initialized) before they are put in tree so 
+         * that it's not found by another thread before it's initialized. 
+         */
 
 	BUG_ON(!phys);
 	BUG_ON(*max_blocks != mapped_blocks);
@@ -489,6 +502,14 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		inode->i_mapping->a_ops = &fat_aops;
 		MSDOS_I(inode)->mmu_private = inode->i_size;
 	}
+
+        /*
+         * SFX_RCROBLES: Set i_flgs in inode to include S_SFX... how do 
+         * we determine if S_SFX should be set? In ext2/3/4, there is a 
+         * super block flag that is set... test_opt(inode->i_sb, XIP) 
+         * Do we need a similar flag for the FAT super block???
+         */
+
 	if (de->attr & ATTR_SYS) {
 		if (sbi->options.sys_immutable)
 			inode->i_flags |= S_IMMUTABLE;
