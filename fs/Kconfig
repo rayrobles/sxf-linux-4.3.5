@@ -31,6 +31,13 @@ source "fs/btrfs/Kconfig"
 source "fs/nilfs2/Kconfig"
 source "fs/f2fs/Kconfig"
 
+config FS_SEFT
+	bool "SCM Extension for FAT (SEFT) Support"
+	depends on MMU
+	depends on !(ARM || MIPS || SPARC)
+	help
+	  SEFT can be used on directly addressable persistent block devices
+
 config FS_DAX
 	bool "Direct Access (DAX) support"
 	depends on MMU
