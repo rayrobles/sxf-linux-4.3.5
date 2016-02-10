@@ -2686,9 +2686,12 @@ extern int generic_file_open(struct inode * inode, struct file * filp);
 extern int nonseekable_open(struct inode * inode, struct file * filp);
 
 /* SEFT I/O Handler */
+#if 0 /* Likely don't need here since seft.h introduced */
 extern ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
                           struct iov_iter *iter, loff_t pos, get_block_t get_block,
                           dio_iodone_t end_io, int flags);
+int seft_clear_blocks(struct inode *, sector_t block, long size);
+#endif
 
 #ifdef CONFIG_BLOCK
 typedef void (dio_submit_t)(int rw, struct bio *bio, struct inode *inode,

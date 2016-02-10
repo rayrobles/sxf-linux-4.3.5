@@ -151,6 +151,17 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
          * must clear the blocks (initialized) before they are put in tree so 
          * that it's not found by another thread before it's initialized. 
          */
+#if 0
+        if (IS_SEFT(inode)) {
+            /*
+             * Block must be initialized before we put it in the tree so that 
+             * it's not found by another thread before it's initialized. 
+             */
+            err = seft_clear_blocks(inode, le32_to_cpu(chain[depth-1].key), 1 << inode->i_blkbits);
+            if (err) {
+            }
+        }
+#endif
 
 	/* available blocks on this cluster */
 	mapped_blocks = sbi->sec_per_clus - offset;

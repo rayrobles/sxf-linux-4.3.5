@@ -8,8 +8,8 @@
 ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
                    struct iov_iter *iter, loff_t pos, get_block_t get_block,
                    dio_iodone_t end_io, int flags);
+int seft_clear_blocks(struct inode *, sector_t block, long size);
 
-//int dax_clear_blocks(struct inode *, sector_t block, long size);
 //int dax_zero_page_range(struct inode *, loff_t from, unsigned len, get_block_t);
 //int dax_truncate_page(struct inode *, loff_t from, get_block_t);
 //int dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t,

@@ -19,7 +19,6 @@
 #include <linux/atomic.h>
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
-//#include <linux/dax.h>
 #include <linux/seft.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
@@ -28,11 +27,11 @@
 //#include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/pmem.h>
-//#include <linux/sched.h>
+#include <linux/sched.h>
 #include <linux/uio.h>
 //#include <linux/vmstat.h>
 
-#if 0
+//int dax_clear_blocks(struct inode *inode, sector_t block, long size)
 int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 {
 	struct block_device *bdev = inode->i_sb->s_bdev;
@@ -45,13 +44,18 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 		long count;
 
 		count = bdev_direct_access(bdev, sector, &addr, &pfn, size);
+
 		if (count < 0)
 			return count;
+
 		BUG_ON(size < count);
+
 		while (count > 0) {
 			unsigned pgsz = PAGE_SIZE - offset_in_page(addr);
+
 			if (pgsz > count)
 				pgsz = count;
+
 			clear_pmem(addr, pgsz);
 			addr += pgsz;
 			size -= pgsz;
@@ -65,8 +69,7 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 	wmb_pmem();
 	return 0;
 }
-EXPORT_SYMBOL_GPL(dax_clear_blocks);
-#endif
+EXPORT_SYMBOL_GPL(seft_clear_blocks);
 
 //static long dax_get_addr(struct buffer_head *bh, void __pmem **addr,
 //                         unsigned blkbits)
