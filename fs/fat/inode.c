@@ -19,6 +19,9 @@
 #include <linux/uio.h>
 #include <linux/blkdev.h>
 #include <linux/backing-dev.h>
+
+#include <linux/seft.h>
+
 #include <asm/unaligned.h>
 #include "fat.h"
 
@@ -273,7 +276,11 @@ static ssize_t fat_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	 * FAT need to use the DIO_LOCKING for avoiding the race
 	 * condition of fat_get_block() and ->truncate().
 	 */
-	ret = blockdev_direct_IO(iocb, inode, iter, offset, fat_get_block);
+        if (IS_SEFT(inode))
+            ret = seft_do_io(iocb, inode, iter, offset, fat_get_block, NULL, DIO_LOCKING);
+        else
+            ret = blockdev_direct_IO(iocb, inode, iter, offset, fat_get_block);
+
 	if (ret < 0 && iov_iter_rw(iter) == WRITE)
 		fat_write_failed(mapping, offset + count);
 
@@ -1065,10 +1072,10 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	opts->tz_set = 0;
 	opts->nfs = 0;
 	opts->errors = FAT_ERRORS_RO;
-#ifdef CONFIG_FS_SEFT
+//#ifdef CONFIG_FS_SEFT
         /* Turn on SEFT by default when mounting */
         opts->seft = 1;
-#endif
+//#endif
 	*debug = 0;
 
 	if (!options)

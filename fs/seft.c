@@ -20,13 +20,14 @@
 #include <linux/blkdev.h>
 #include <linux/buffer_head.h>
 //#include <linux/dax.h>
+#include <linux/seft.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
 //#include <linux/highmem.h>
 //#include <linux/memcontrol.h>
 //#include <linux/mm.h>
 #include <linux/mutex.h>
-//#include <linux/pmem.h>
+#include <linux/pmem.h>
 //#include <linux/sched.h>
 #include <linux/uio.h>
 //#include <linux/vmstat.h>
@@ -273,7 +274,8 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
  out:
 	return retval;
 }
-EXPORT_SYMBOL_GPL(seft_do_io);
+EXPORT_SYMBOL(seft_do_io);
+//EXPORT_SYMBOL_GPL(seft_do_io);
 
 
 

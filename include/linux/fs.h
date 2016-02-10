@@ -2685,6 +2685,11 @@ extern loff_t fixed_size_llseek(struct file *file, loff_t offset,
 extern int generic_file_open(struct inode * inode, struct file * filp);
 extern int nonseekable_open(struct inode * inode, struct file * filp);
 
+/* SEFT I/O Handler */
+extern ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
+                          struct iov_iter *iter, loff_t pos, get_block_t get_block,
+                          dio_iodone_t end_io, int flags);
+
 #ifdef CONFIG_BLOCK
 typedef void (dio_submit_t)(int rw, struct bio *bio, struct inode *inode,
 			    loff_t file_offset);

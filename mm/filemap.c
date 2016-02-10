@@ -1719,7 +1719,14 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	loff_t *ppos = &iocb->ki_pos;
 	loff_t pos = *ppos;
 
-	if (iocb->ki_flags & IOCB_DIRECT) {
+        /* 
+         * SEFT_RCROBLES: There is supposed to be a change here for checking
+         * for direct IO (via io_is_direct(file)... although it appears that 
+         * change is now gone in lieu of the IOCB_DIRECT flag being checked 
+         * on the iocb. Come back and check to see if we need use the macro.
+         */
+        //if (io_is_direct(file))
+        if (iocb->ki_flags & IOCB_DIRECT) {
 		struct address_space *mapping = file->f_mapping;
 		struct inode *inode = mapping->host;
 		size_t count = iov_iter_count(iter);
@@ -2576,6 +2583,13 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (err)
 		goto out;
 
+        /* 
+         * SEFT_RCROBLES: There is supposed to be a change here for checking
+         * for direct IO (via io_is_direct(file)... although it appears that 
+         * change is now gone in lieu of the IOCB_DIRECT flag being checked 
+         * on the iocb. Come back and check to see if we need use the macro.
+         */
+        //if (io_is_direct(file))
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		loff_t pos, endbyte;
 

@@ -51,9 +51,9 @@ struct fat_mount_options {
 		 rodir:1,	   /* allow ATTR_RO for directory */
 		 discard:1,	   /* Issue discard requests on deletions */
 		 dos1xfloppy:1,	   /* Assume default BPB for DOS 1.x floppies */
-#ifdef CONFIG_FS_SEFT
+//#ifdef CONFIG_FS_SEFT
                  seft:1;           /* 1 = SEFT enabled (SCM extensions), 0 = SEFT disabled */
-#endif
+//#endif
 };
 
 #define FAT_HASH_BITS	8
