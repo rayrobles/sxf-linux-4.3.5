@@ -73,8 +73,6 @@ typedef void (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 			ssize_t bytes, void *private);
 typedef void (dax_iodone_t)(struct buffer_head *bh_map, int uptodate);
 
-#define CONFIG_FS_SEFT          1
-
 #define MAY_EXEC		0x00000001
 #define MAY_WRITE		0x00000002
 #define MAY_READ		0x00000004
@@ -2691,6 +2689,8 @@ extern ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
                           struct iov_iter *iter, loff_t pos, get_block_t get_block,
                           dio_iodone_t end_io, int flags);
 int seft_clear_blocks(struct inode *, sector_t block, long size);
+int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+               get_block_t get_block, dax_iodone_t complete_unwritten);
 #endif
 
 #ifdef CONFIG_BLOCK

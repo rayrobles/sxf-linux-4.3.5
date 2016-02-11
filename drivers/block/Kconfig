@@ -404,6 +404,17 @@ config BLK_DEV_RAM_DAX
 	  and will prevent RAM block device backing store memory from being
 	  allocated from highmem (only a problem for highmem systems).
 
+config BLK_DEV_RAM_SEFT
+	bool "Support SCM Extension for FAT (SEFT) to RAM block devices"
+	depends on BLK_DEV_RAM && FS_SEFT
+	default n
+	help
+	  Support filesystems using SEFT to access RAM block devices.  This
+	  avoids double-buffering data in the page cache before copying it
+	  to the block device.  Answering Y will slightly enlarge the kernel,
+	  and will prevent RAM block device backing store memory from being
+	  allocated from highmem (only a problem for highmem systems).
+
 config CDROM_PKTCDVD
 	tristate "Packet writing on CD/DVD media"
 	depends on !UML

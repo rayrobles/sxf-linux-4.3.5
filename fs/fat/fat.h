@@ -360,7 +360,12 @@ extern int fat_count_free_clusters(struct super_block *sb);
 /* fat/file.c */
 extern long fat_generic_ioctl(struct file *filp, unsigned int cmd,
 			      unsigned long arg);
+
+
 extern const struct file_operations fat_file_operations;
+//extern const struct file_operations fat_seft_file_operations;
+
+
 extern const struct inode_operations fat_file_inode_operations;
 extern int fat_setattr(struct dentry *dentry, struct iattr *attr);
 extern void fat_truncate_blocks(struct inode *inode, loff_t offset);
@@ -383,6 +388,9 @@ extern int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de);
 
 extern int fat_flush_inodes(struct super_block *sb, struct inode *i1,
 			    struct inode *i2);
+extern int fat_get_block(struct inode *inode, sector_t iblock,
+                         struct buffer_head *bh_result, int create);
+
 static inline unsigned long fat_dir_hash(int logstart)
 {
 	return hash_32(logstart, FAT_HASH_BITS);

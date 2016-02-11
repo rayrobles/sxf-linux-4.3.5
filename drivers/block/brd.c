@@ -103,7 +103,7 @@ static struct page *brd_insert_page(struct brd_device *brd, sector_t sector)
 	 * restriction might be able to be lifted.
 	 */
 	gfp_flags = GFP_NOIO | __GFP_ZERO;
-#ifndef CONFIG_BLK_DEV_RAM_DAX
+#ifndef CONFIG_BLK_DEV_RAM_DAX && CONFIG_BLK_DEV_RAM_SEFT
 	gfp_flags |= __GFP_HIGHMEM;
 #endif
 	page = alloc_page(gfp_flags);
@@ -372,9 +372,9 @@ static int brd_rw_page(struct block_device *bdev, sector_t sector,
 	return err;
 }
 
-#ifdef CONFIG_BLK_DEV_RAM_DAX
+#ifdef CONFIG_BLK_DEV_RAM_DAX || CONFIG_BLK_DEV_RAM_SEFT
 static long brd_direct_access(struct block_device *bdev, sector_t sector,
-			void __pmem **kaddr, unsigned long *pfn)
+                              void __pmem **kaddr, unsigned long *pfn)
 {
 	struct brd_device *brd = bdev->bd_disk->private_data;
 	struct page *page;

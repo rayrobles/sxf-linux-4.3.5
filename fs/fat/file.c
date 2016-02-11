@@ -6,6 +6,7 @@
  *  regular file handling primitives for fat-based filesystems
  */
 
+#include <linux/fs.h>
 #include <linux/capability.h>
 #include <linux/module.h>
 #include <linux/compat.h>
@@ -14,10 +15,48 @@
 #include <linux/backing-dev.h>
 #include <linux/fsnotify.h>
 #include <linux/security.h>
-
 #include <linux/seft.h>
-
 #include "fat.h"
+
+#ifdef CONFIG_FS_SEFT
+static int fat_seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return seft_fault(vma, vmf, fat_get_block, NULL);
+}
+
+//static int fat_seft_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
+//                              pmd_t *pmd, unsigned int flags)
+//{
+//	return seft_pmd_fault(vma, addr, pmd, flags, ext2_get_block, NULL);
+//}
+
+static int fat_seft_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
+{
+	return seft_mkwrite(vma, vmf, fat_get_block, NULL);
+}
+
+static const struct vm_operations_struct fat_seft_vm_ops = {
+	.fault		= fat_seft_fault,
+	.page_mkwrite	= fat_seft_mkwrite,
+//      .pmd_fault	= ext2_dax_pmd_fault,
+//	.pfn_mkwrite	= dax_pfn_mkwrite,
+};
+
+static int seft_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	if (!IS_SEFT(file_inode(file)))
+		return generic_file_mmap(file, vma);
+
+	file_accessed(file);
+	vma->vm_ops = &fat_seft_vm_ops;
+	//vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
+	vma->vm_flags |= VM_MIXEDMAP;
+	return 0;
+}
+#else
+//#define ext2_file_mmap	generic_file_mmap
+#define seft_file_mmap	generic_file_mmap
+#endif
 
 static int fat_ioctl_get_attributes(struct inode *inode, u32 __user *user_attr)
 {
@@ -178,7 +217,8 @@ const struct file_operations fat_file_operations = {
 //        .write          = new_sync_write,
         .read_iter	= generic_file_read_iter,
         .write_iter	= generic_file_write_iter,
-	.mmap		= generic_file_mmap,
+//	.mmap		= generic_file_mmap,
+	.mmap		= seft_file_mmap,
 	.release	= fat_file_release,
 	.unlocked_ioctl	= fat_generic_ioctl,
 #ifdef CONFIG_COMPAT

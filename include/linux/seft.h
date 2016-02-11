@@ -9,13 +9,16 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
                    struct iov_iter *iter, loff_t pos, get_block_t get_block,
                    dio_iodone_t end_io, int flags);
 int seft_clear_blocks(struct inode *, sector_t block, long size);
+int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+               get_block_t get_block, dax_iodone_t complete_unwritten);
+int __seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+                 get_block_t get_block, dax_iodone_t complete_unwritten);
 
-//int dax_zero_page_range(struct inode *, loff_t from, unsigned len, get_block_t);
-//int dax_truncate_page(struct inode *, loff_t from, get_block_t);
-//int dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t,
-//		dax_iodone_t);
-//int __dax_fault(struct vm_area_struct *, struct vm_fault *, get_block_t,
-//		dax_iodone_t);
+#define seft_mkwrite(vma, vmf, gb, iod)		seft_fault(vma, vmf, gb, iod)
+#define __seft_mkwrite(vma, vmf, gb, iod)	__seft_fault(vma, vmf, gb, iod)
+
+int seft_zero_page_range(struct inode *, loff_t from, unsigned len, get_block_t);
+int seft_truncate_page(struct inode *, loff_t from, get_block_t);
 
 //#ifdef CONFIG_TRANSPARENT_HUGEPAGE
 //int dax_pmd_fault(struct vm_area_struct *, unsigned long addr, pmd_t *,
@@ -34,12 +37,9 @@ int seft_clear_blocks(struct inode *, sector_t block, long size);
 
 //int dax_pfn_mkwrite(struct vm_area_struct *, struct vm_fault *);
 
-//#define dax_mkwrite(vma, vmf, gb, iod)		dax_fault(vma, vmf, gb, iod)
-//#define __dax_mkwrite(vma, vmf, gb, iod)	__dax_fault(vma, vmf, gb, iod)
-
-//static inline bool vma_is_dax(struct vm_area_struct *vma)
-//{
-//	return vma->vm_file && IS_DAX(vma->vm_file->f_mapping->host);
-//}
+static inline bool vma_is_seft(struct vm_area_struct *vma)
+{
+	return vma->vm_file && IS_SEFT(vma->vm_file->f_mapping->host);
+}
 
 #endif

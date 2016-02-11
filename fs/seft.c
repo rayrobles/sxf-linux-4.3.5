@@ -22,16 +22,15 @@
 #include <linux/seft.h>
 #include <linux/fs.h>
 #include <linux/genhd.h>
-//#include <linux/highmem.h>
-//#include <linux/memcontrol.h>
-//#include <linux/mm.h>
+#include <linux/highmem.h>
+#include <linux/memcontrol.h>
+#include <linux/mm.h>
 #include <linux/mutex.h>
 #include <linux/pmem.h>
 #include <linux/sched.h>
 #include <linux/uio.h>
-//#include <linux/vmstat.h>
+#include <linux/vmstat.h>
 
-//int dax_clear_blocks(struct inode *inode, sector_t block, long size)
 int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 {
 	struct block_device *bdev = inode->i_sb->s_bdev;
@@ -71,8 +70,6 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 }
 EXPORT_SYMBOL_GPL(seft_clear_blocks);
 
-//static long dax_get_addr(struct buffer_head *bh, void __pmem **addr,
-//                         unsigned blkbits)
 static long seft_get_addr(struct buffer_head *bh, void **addr, unsigned blkbits)
 {
 	unsigned long pfn;
@@ -81,21 +78,19 @@ static long seft_get_addr(struct buffer_head *bh, void **addr, unsigned blkbits)
 }
 
 /* the clear_pmem() calls are ordered by a wmb_pmem() in the caller */
-//static void dax_new_buf(void __pmem *addr, unsigned size, unsigned first,
-//		loff_t pos, loff_t end)
 static void seft_new_buf(void *addr, unsigned size, unsigned first, loff_t pos,
                         loff_t end)
 {
 	loff_t final = end - pos + first; /* The final byte of the buffer */
 
-//	if (first > 0)
-//		clear_pmem(addr, first);
-//	if (final < size)
-//		clear_pmem(addr + final, size - final);
 	if (first > 0)
-		memset(addr, 0, first);
+		clear_pmem(addr, first);
 	if (final < size)
-		memset(addr + final, 0, size - final);
+		clear_pmem(addr + final, size - final);
+//	if (first > 0)
+//		memset(addr, 0, first);
+//	if (final < size)
+//		memset(addr + final, 0, size - final);
 
 }
 
@@ -118,9 +113,6 @@ static bool buffer_size_valid(struct buffer_head *bh)
 	return bh->b_state != 0;
 }
 
-//static ssize_t dax_io(struct inode *inode, struct iov_iter *iter,
-//		      loff_t start, loff_t end, get_block_t get_block,
-//		      struct buffer_head *bh)
 static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
                        loff_t start, loff_t end, get_block_t get_block,
                        struct buffer_head *bh)
@@ -129,7 +121,6 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	loff_t pos = start;
 	loff_t max = start;
 	loff_t bh_max = start;
-//	void *addr;
 	void __pmem *addr;
 	bool hole = false;
 	bool need_wmb = false;
@@ -236,9 +227,6 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
  * As with do_blockdev_direct_IO(), we increment i_dio_count while the I/O
  * is in progress.
  */
-//ssize_t dax_do_io(struct kiocb *iocb, struct inode *inode,
-//		  struct iov_iter *iter, loff_t pos, get_block_t get_block,
-//		  dio_iodone_t end_io, int flags)
 ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
                    struct iov_iter *iter, loff_t pos, get_block_t get_block,
                    dio_iodone_t end_io, int flags)
@@ -263,7 +251,6 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 	if (!(flags & DIO_SKIP_DIO_COUNT))
 		inode_dio_begin(inode);
 
-//	retval = dax_io(inode, iter, pos, end, get_block, &bh);
 	retval = seft_io(inode, iter, pos, end, get_block, &bh);
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
@@ -277,12 +264,8 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
  out:
 	return retval;
 }
-EXPORT_SYMBOL(seft_do_io);
-//EXPORT_SYMBOL_GPL(seft_do_io);
+EXPORT_SYMBOL_GPL(seft_do_io);
 
-
-
-#if 0
 /*
  * The user has performed a load from a hole in the file.  Allocating
  * a new page in the file would cause excessive storage usage for
@@ -291,22 +274,25 @@ EXPORT_SYMBOL(seft_do_io);
  * otherwise it will simply fall out of the page cache under memory
  * pressure without ever having been dirtied.
  */
-static int dax_load_hole(struct address_space *mapping, struct page *page,
-							struct vm_fault *vmf)
+static int seft_load_hole(struct address_space *mapping, struct page *page,
+                          struct vm_fault *vmf)
 {
 	unsigned long size;
 	struct inode *inode = mapping->host;
+
 	if (!page)
-		page = find_or_create_page(mapping, vmf->pgoff,
-						GFP_KERNEL | __GFP_ZERO);
+            page = find_or_create_page(mapping, vmf->pgoff,
+                                       GFP_KERNEL | __GFP_ZERO);
+
 	if (!page)
-		return VM_FAULT_OOM;
+            return VM_FAULT_OOM;
+
 	/* Recheck i_size under page lock to avoid truncate race */
 	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (vmf->pgoff >= size) {
-		unlock_page(page);
-		page_cache_release(page);
-		return VM_FAULT_SIGBUS;
+            unlock_page(page);
+            page_cache_release(page);
+            return VM_FAULT_SIGBUS;
 	}
 
 	vmf->page = page;
@@ -319,16 +305,17 @@ static int copy_user_bh(struct page *to, struct buffer_head *bh,
 	void __pmem *vfrom;
 	void *vto;
 
-	if (dax_get_addr(bh, &vfrom, blkbits) < 0)
-		return -EIO;
+	if (seft_get_addr(bh, &vfrom, blkbits) < 0)
+            return -EIO;
+
 	vto = kmap_atomic(to);
 	copy_user_page(vto, (void __force *)vfrom, vaddr, to);
 	kunmap_atomic(vto);
 	return 0;
 }
 
-static int dax_insert_mapping(struct inode *inode, struct buffer_head *bh,
-			struct vm_area_struct *vma, struct vm_fault *vmf)
+static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
+                               struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct address_space *mapping = inode->i_mapping;
 	sector_t sector = bh->b_blocknr << (inode->i_blkbits - 9);
@@ -375,7 +362,7 @@ static int dax_insert_mapping(struct inode *inode, struct buffer_head *bh,
 }
 
 /**
- * __dax_fault - handle a page fault on a DAX file
+ * __seft_fault - handle a page fault on a SEFT file
  * @vma: The virtual memory area where the fault occurred
  * @vmf: The description of the fault
  * @get_block: The filesystem method used to translate file offsets to blocks
@@ -383,15 +370,17 @@ static int dax_insert_mapping(struct inode *inode, struct buffer_head *bh,
  *	to written so the data written to them is exposed. This is required for
  *	required by write faults for filesystems that will return unwritten
  *	extent mappings from @get_block, but it is optional for reads as
- *	dax_insert_mapping() will always zero unwritten blocks. If the fs does
- *	not support unwritten extents, the it should pass NULL.
+ *      seft_insert_mapping() will always zero unwritten blocks.
+ *      If the fs does not support unwritten extents, then it
+ *      should pass NULL.
  *
  * When a page fault occurs, filesystems may call this helper in their
- * fault handler for DAX files. __dax_fault() assumes the caller has done all
- * the necessary locking for the page fault to proceed successfully.
+ * fault handler for SEFT files. __seft_fault() assumes the 
+ * caller has done all the necessary locking for the page fault 
+ * to proceed successfully. 
  */
-int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
-			get_block_t get_block, dax_iodone_t complete_unwritten)
+int __seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+                 get_block_t get_block, dax_iodone_t complete_unwritten)
 {
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
@@ -453,7 +442,7 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 			if (error)
 				goto unlock_page;
 		} else {
-			return dax_load_hole(mapping, page, vmf);
+			return seft_load_hole(mapping, page, vmf);
 		}
 	}
 
@@ -470,7 +459,7 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 			i_mmap_lock_read(mapping);
 			/* Check we didn't race with truncate */
 			size = (i_size_read(inode) + PAGE_SIZE - 1) >>
-								PAGE_SHIFT;
+                            PAGE_SHIFT;
 			if (vmf->pgoff >= size) {
 				i_mmap_unlock_read(mapping);
 				error = -EIO;
@@ -486,7 +475,7 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 
 	if (page) {
 		unmap_mapping_range(mapping, vmf->pgoff << PAGE_SHIFT,
-							PAGE_CACHE_SIZE, 0);
+                                    PAGE_CACHE_SIZE, 0);
 		delete_from_page_cache(page);
 		unlock_page(page);
 		page_cache_release(page);
@@ -502,7 +491,7 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	 * indicate what the callback should do via the uptodate variable, same
 	 * as for normal BH based IO completions.
 	 */
-	error = dax_insert_mapping(inode, &bh, vma, vmf);
+	error = seft_insert_mapping(inode, &bh, vma, vmf);
 	if (buffer_unwritten(&bh)) {
 		if (complete_unwritten)
 			complete_unwritten(&bh, !error);
@@ -525,19 +514,19 @@ int __dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	}
 	goto out;
 }
-EXPORT_SYMBOL(__dax_fault);
+EXPORT_SYMBOL_GPL(__seft_fault);
 
 /**
- * dax_fault - handle a page fault on a DAX file
+ * sef_fault - handle a page fault on a SEFT file
  * @vma: The virtual memory area where the fault occurred
  * @vmf: The description of the fault
  * @get_block: The filesystem method used to translate file offsets to blocks
  *
  * When a page fault occurs, filesystems may call this helper in their
- * fault handler for DAX files.
+ * fault handler for SEFT files.
  */
-int dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
-	      get_block_t get_block, dax_iodone_t complete_unwritten)
+int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
+               get_block_t get_block, dax_iodone_t complete_unwritten)
 {
 	int result;
 	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
@@ -546,14 +535,16 @@ int dax_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 		sb_start_pagefault(sb);
 		file_update_time(vma->vm_file);
 	}
-	result = __dax_fault(vma, vmf, get_block, complete_unwritten);
+	result = __seft_fault(vma, vmf, get_block, complete_unwritten);
 	if (vmf->flags & FAULT_FLAG_WRITE)
 		sb_end_pagefault(sb);
 
 	return result;
 }
-EXPORT_SYMBOL_GPL(dax_fault);
+EXPORT_SYMBOL_GPL(seft_fault);
 
+
+#if 0
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 /*
  * The 'colour' (ie low bits) within a PMD of a page offset.  This comes up
@@ -741,18 +732,20 @@ int dax_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return VM_FAULT_NOPAGE;
 }
 EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
+#endif
 
 /**
- * dax_zero_page_range - zero a range within a page of a DAX file
+ * seft_zero_page_range - zero a range within a page of a SEFT 
+ * file 
  * @inode: The file being truncated
  * @from: The file offset that is being truncated to
  * @length: The number of bytes to zero
  * @get_block: The filesystem method used to translate file offsets to blocks
  *
  * This function can be called by a filesystem when it is zeroing part of a
- * page in a DAX file.  This is intended for hole-punch operations.  If
- * you are truncating a file, the helper function dax_truncate_page() may be
- * more convenient.
+ * page in a SEFT file.  This is intended for hole-punch 
+ * operations. If you are truncating a file, the helper function
+ * seft_truncate_page() may be more convenient. 
  *
  * We work in terms of PAGE_CACHE_SIZE here for commonality with
  * block_truncate_page(), but we could go down to PAGE_SIZE if the filesystem
@@ -760,8 +753,8 @@ EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
  * block size is smaller than PAGE_SIZE, we have to zero the rest of the page
  * since the file might be mmapped.
  */
-int dax_zero_page_range(struct inode *inode, loff_t from, unsigned length,
-							get_block_t get_block)
+int seft_zero_page_range(struct inode *inode, loff_t from, unsigned length,
+                         get_block_t get_block)
 {
 	struct buffer_head bh;
 	pgoff_t index = from >> PAGE_CACHE_SHIFT;
@@ -780,7 +773,7 @@ int dax_zero_page_range(struct inode *inode, loff_t from, unsigned length,
 		return err;
 	if (buffer_written(&bh)) {
 		void __pmem *addr;
-		err = dax_get_addr(&bh, &addr, inode->i_blkbits);
+		err = seft_get_addr(&bh, &addr, inode->i_blkbits);
 		if (err < 0)
 			return err;
 		clear_pmem(addr + offset, length);
@@ -789,16 +782,18 @@ int dax_zero_page_range(struct inode *inode, loff_t from, unsigned length,
 
 	return 0;
 }
-EXPORT_SYMBOL_GPL(dax_zero_page_range);
+EXPORT_SYMBOL_GPL(seft_zero_page_range);
 
 /**
- * dax_truncate_page - handle a partial page being truncated in a DAX file
+ * seft_truncate_page - handle a partial page being truncated in
+ * a SEFT file 
  * @inode: The file being truncated
  * @from: The file offset that is being truncated to
  * @get_block: The filesystem method used to translate file offsets to blocks
  *
  * Similar to block_truncate_page(), this function can be called by a
- * filesystem when it is truncating a DAX file to handle the partial page.
+ * filesystem when it is truncating a SEFT file to handle the 
+ * partial page. 
  *
  * We work in terms of PAGE_CACHE_SIZE here for commonality with
  * block_truncate_page(), but we could go down to PAGE_SIZE if the filesystem
@@ -806,10 +801,9 @@ EXPORT_SYMBOL_GPL(dax_zero_page_range);
  * block size is smaller than PAGE_SIZE, we have to zero the rest of the page
  * since the file might be mmapped.
  */
-int dax_truncate_page(struct inode *inode, loff_t from, get_block_t get_block)
+int seft_truncate_page(struct inode *inode, loff_t from, get_block_t get_block)
 {
 	unsigned length = PAGE_CACHE_ALIGN(from) - from;
-	return dax_zero_page_range(inode, from, length, get_block);
+	return seft_zero_page_range(inode, from, length, get_block);
 }
-EXPORT_SYMBOL_GPL(dax_truncate_page);
-#endif
+EXPORT_SYMBOL_GPL(seft_truncate_page);

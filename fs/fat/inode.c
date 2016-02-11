@@ -181,8 +181,8 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	return 0;
 }
 
-static int fat_get_block(struct inode *inode, sector_t iblock,
-			 struct buffer_head *bh_result, int create)
+int fat_get_block(struct inode *inode, sector_t iblock,
+                  struct buffer_head *bh_result, int create)
 {
 	struct super_block *sb = inode->i_sb;
 	unsigned long max_blocks = bh_result->b_size >> inode->i_blkbits;
@@ -319,7 +319,10 @@ static sector_t _fat_bmap(struct address_space *mapping, sector_t block)
  */
 int fat_block_truncate_page(struct inode *inode, loff_t from)
 {
-	return block_truncate_page(inode->i_mapping, from, fat_get_block);
+    if (IS_SEFT(inode))
+        return seft_truncate_page(inode, from, fat_get_block); 
+    else
+        return block_truncate_page(inode->i_mapping, from, fat_get_block); 
 }
 
 static const struct address_space_operations fat_aops = {
@@ -1083,10 +1086,10 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	opts->tz_set = 0;
 	opts->nfs = 0;
 	opts->errors = FAT_ERRORS_RO;
-//#ifdef CONFIG_FS_SEFT
+#ifdef CONFIG_FS_SEFT
         /* Turn on SEFT by default when mounting */
         opts->seft = 1;
-//#endif
+#endif
 	*debug = 0;
 
 	if (!options)
