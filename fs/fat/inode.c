@@ -121,6 +121,8 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	sector_t phys;
 	int err, offset;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: entering");
+
 	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
 	if (err)
 		return err;
@@ -168,6 +170,8 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 
 	*max_blocks = min(mapped_blocks, *max_blocks);
 	MSDOS_I(inode)->mmu_private += *max_blocks << sb->s_blocksize_bits;
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: updated mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: calling fat_bmap");
 
 	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
 	if (err)
@@ -188,6 +192,8 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 	unsigned long max_blocks = bh_result->b_size >> inode->i_blkbits;
 	int err;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_get_block: entering");
+
 	err = __fat_get_block(inode, iblock, &max_blocks, bh_result, create);
 	if (err)
 		return err;
@@ -197,29 +203,40 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 
 static int fat_writepage(struct page *page, struct writeback_control *wbc)
 {
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_writepage: entering");
+        printk(KERN_NOTICE "SEFT: fat_writepage: entering");
 	return block_write_full_page(page, fat_get_block, wbc);
 }
 
 static int fat_writepages(struct address_space *mapping,
 			  struct writeback_control *wbc)
 {
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_writepages: entering");
+        printk(KERN_NOTICE "SEFT: fat_writepages: entering");
 	return mpage_writepages(mapping, wbc, fat_get_block);
 }
 
 static int fat_readpage(struct file *file, struct page *page)
 {
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_readpage: entering");
+        printk(KERN_NOTICE "SEFT: fat_readpage: entering");
 	return mpage_readpage(page, fat_get_block);
 }
 
 static int fat_readpages(struct file *file, struct address_space *mapping,
 			 struct list_head *pages, unsigned nr_pages)
 {
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_readpages: entering");
+        printk(KERN_NOTICE "SEFT: fat_readpages: entering");
 	return mpage_readpages(mapping, pages, nr_pages, fat_get_block);
 }
 
 static void fat_write_failed(struct address_space *mapping, loff_t to)
 {
 	struct inode *inode = mapping->host;
+
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_failed: entering");
+        printk(KERN_NOTICE "SEFT: fat_write_failed: entering");
 
 	if (to > inode->i_size) {
 		truncate_pagecache(inode, inode->i_size);
@@ -232,8 +249,11 @@ static int fat_write_begin(struct file *file, struct address_space *mapping,
 			struct page **pagep, void **fsdata)
 {
 	int err;
-
 	*pagep = NULL;
+
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_begin: entering");
+        printk(KERN_NOTICE "SEFT: fat_write_begin: entering");
+
 	err = cont_write_begin(file, mapping, pos, len, flags,
 				pagep, fsdata, fat_get_block,
 				&MSDOS_I(mapping->host)->mmu_private);
@@ -248,6 +268,10 @@ static int fat_write_end(struct file *file, struct address_space *mapping,
 {
 	struct inode *inode = mapping->host;
 	int err;
+
+        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_end: entering");
+        printk(KERN_NOTICE "SEFT: fat_write_end: entering");
+
 	err = generic_write_end(file, mapping, pos, len, copied, pagep, fsdata);
 	if (err < len)
 		fat_write_failed(mapping, pos + len);
@@ -268,7 +292,19 @@ static ssize_t fat_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 	size_t count = iov_iter_count(iter);
 	ssize_t ret;
 
-	if (iov_iter_rw(iter) == WRITE) {
+        //printk(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: entering");
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: entering");
+        //fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: iocb = 0x%llx", (unsigned long long)iocb);
+        //fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: iocb->ki_flags = 0x%x", iocb->ki_flags);
+
+        //if (IS_SEFT(inode)) {
+        //    fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: SEFT_IO set in inode");
+        //}
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: count = 0x%zx", count);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: offset = 0x%llx", (long long)offset);
+
+        if (iov_iter_rw(iter) == WRITE) {
 		/*
 		 * FIXME: blockdev_direct_IO() doesn't use ->write_begin(),
 		 * so we need to update the ->mmu_private to block boundary.
@@ -279,21 +315,44 @@ static ssize_t fat_direct_IO(struct kiocb *iocb, struct iov_iter *iter,
 		 * Return 0, and fallback to normal buffered write.
 		 */
 		loff_t size = offset + count;
-		if (MSDOS_I(inode)->mmu_private < size)
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: write cmd");
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: MSDOS_I(inode)->mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: size (offset+count) = 0x%llx", (long long)size);
+
+                // commenting out for test... should we return here if mmu_private is 0?????
+                #if 0
+		if (MSDOS_I(inode)->mmu_private < size) {
+                        //fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: write cmd returning early because inode->mmu_private < size");
+                        //fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: MSDOS_I(inode)->mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
+                        //fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: size (offset+count) = 0x%llx", (long long)size);
+                        //while (1) {
+                        //}
+                        //BUG_ON(false);
 			return 0;
+                }
+                #endif
 	}
 
 	/*
 	 * FAT need to use the DIO_LOCKING for avoiding the race
 	 * condition of fat_get_block() and ->truncate().
 	 */
-        if (IS_SEFT(inode))
+        if (IS_SEFT(inode)) {
+            fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: calling seft_do_io");
             ret = seft_do_io(iocb, inode, iter, offset, fat_get_block, NULL, DIO_LOCKING);
-        else
+        } else {
+            fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: calling blockdev_do_IO");
             ret = blockdev_direct_IO(iocb, inode, iter, offset, fat_get_block);
+        }
 
-	if (ret < 0 && iov_iter_rw(iter) == WRITE)
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: ret (after IO call) = 0x%zx", ret);
+
+	if (ret < 0 && iov_iter_rw(iter) == WRITE) {
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: calling fat_write_failed");
 		fat_write_failed(mapping, offset + count);
+        }
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_direct_IO: exiting... ret = 0x%zx", ret);
 
 	return ret;
 }
@@ -302,11 +361,14 @@ static sector_t _fat_bmap(struct address_space *mapping, sector_t block)
 {
 	sector_t blocknr;
 
+        fat_msg(mapping->host->i_sb, KERN_NOTICE, "SEFT: _fat_bmap: entering");
+
 	/* fat_get_cluster() assumes the requested blocknr isn't truncated. */
 	down_read(&MSDOS_I(mapping->host)->truncate_lock);
 	blocknr = generic_block_bmap(mapping, block, fat_get_block);
 	up_read(&MSDOS_I(mapping->host)->truncate_lock);
 
+        //fat_msg(mapping->host->i_sb, KERN_NOTICE, "SEFT: fat_bmap: exiting... blocknr = 0x%llx", blocknr);
 	return blocknr;
 }
 
@@ -319,10 +381,14 @@ static sector_t _fat_bmap(struct address_space *mapping, sector_t block)
  */
 int fat_block_truncate_page(struct inode *inode, loff_t from)
 {
-    if (IS_SEFT(inode))
+    fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_block_truncate_page: entering");
+
+    if (IS_SEFT(inode)) {
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_block_truncate_page: calling seft_truncate_page");
         return seft_truncate_page(inode, from, fat_get_block); 
-    else
+    } else {
         return block_truncate_page(inode->i_mapping, from, fat_get_block); 
+    }
 }
 
 static const struct address_space_operations fat_aops = {
@@ -483,11 +549,25 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	int error;
 
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: entering");
+
 	MSDOS_I(inode)->i_pos = 0;
 	inode->i_uid = sbi->options.fs_uid;
 	inode->i_gid = sbi->options.fs_gid;
 	inode->i_version++;
 	inode->i_generation = get_seconds();
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[0] = %d", de->name[0]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[1] = %d", de->name[1]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[2] = %d", de->name[2]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[3] = %d", de->name[3]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[4] = %d", de->name[4]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[5] = %d", de->name[5]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[6] = %d", de->name[6]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[7] = %d", de->name[7]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[8] = %d", de->name[8]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[9] = %d", de->name[9]);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: de->name[10] = %d", de->name[10]);
 
 	if ((de->attr & ATTR_DIR) && !IS_FREE(de->name)) {
 		inode->i_generation &= ~1;
@@ -501,6 +581,7 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		if (error < 0)
 			return error;
 		MSDOS_I(inode)->mmu_private = inode->i_size;
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: setting mmu_private(dir) = 0x%llx from inode->size", (long long)inode->i_size);
 
 		set_nlink(inode, fat_subdirs(inode));
 	} else { /* not a directory */
@@ -516,13 +597,19 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 		inode->i_fop = &fat_file_operations;
 		inode->i_mapping->a_ops = &fat_aops;
 		MSDOS_I(inode)->mmu_private = inode->i_size;
-	}
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: setting mmu_private(!dir) = 0x%llx", (long long)inode->i_size);
+
+                //while (1) { };
+        }
 
         /* Set i_flgs in inode to include S_SEFT based on sb mount option */
-        if (sbi->options.seft)
+        if (sbi->options.seft) {
+            fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: setting S_SEFT inode flag");
             inode->i_flags |= S_SEFT;
-        else
+        } else {
+            fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: clearoing S_SEFT inode flag");
             inode->i_flags &= ~S_SEFT;
+        }
 
 	if (de->attr & ATTR_SYS) {
 		if (sbi->options.sys_immutable)
@@ -541,6 +628,7 @@ int fat_fill_inode(struct inode *inode, struct msdos_dir_entry *de)
 	} else
 		inode->i_ctime = inode->i_atime = inode->i_mtime;
 
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_fill_inode: exiting");
 	return 0;
 }
 
@@ -562,6 +650,8 @@ struct inode *fat_build_inode(struct super_block *sb,
 	struct inode *inode;
 	int err;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_build_inode: entering");
+
 	fat_lock_build_inode(MSDOS_SB(sb));
 	inode = fat_iget(sb, i_pos);
 	if (inode)
@@ -573,6 +663,8 @@ struct inode *fat_build_inode(struct super_block *sb,
 	}
 	inode->i_ino = iunique(sb, MSDOS_ROOT_INO);
 	inode->i_version = 1;
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_build_inode: calling fat_fill_inode with de->size = 0x%x", de->size);
 	err = fat_fill_inode(inode, de);
 	if (err) {
 		iput(inode);
@@ -583,6 +675,7 @@ struct inode *fat_build_inode(struct super_block *sb,
 	insert_inode_hash(inode);
 out:
 	fat_unlock_build_inode(MSDOS_SB(sb));
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_build_inode: exiting");
 	return inode;
 }
 
@@ -590,6 +683,8 @@ EXPORT_SYMBOL_GPL(fat_build_inode);
 
 static void fat_evict_inode(struct inode *inode)
 {
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_evict_inode: entering");
+
 	truncate_inode_pages_final(&inode->i_data);
 	if (!inode->i_nlink) {
 		inode->i_size = 0;
@@ -599,6 +694,8 @@ static void fat_evict_inode(struct inode *inode)
 	clear_inode(inode);
 	fat_cache_inval_inode(inode);
 	fat_detach(inode);
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_evict_inode: exiting");
 }
 
 static void fat_set_state(struct super_block *sb,
@@ -607,6 +704,8 @@ static void fat_set_state(struct super_block *sb,
 	struct buffer_head *bh;
 	struct fat_boot_sector *b;
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_set_state: entering");
 
 	/* do not change any thing if mounted read only */
 	if ((sb->s_flags & MS_RDONLY) && !force)
@@ -646,6 +745,8 @@ static void fat_set_state(struct super_block *sb,
 	mark_buffer_dirty(bh);
 	sync_dirty_buffer(bh);
 	brelse(bh);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_set_state: exiting");
 }
 
 static void delayed_free(struct rcu_head *p)
@@ -662,12 +763,14 @@ static void fat_put_super(struct super_block *sb)
 {
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_put_super: entering");
 	fat_set_state(sb, 0, 0);
 
 	iput(sbi->fsinfo_inode);
 	iput(sbi->fat_inode);
 
 	call_rcu(&sbi->rcu, delayed_free);
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_put_super: exiting");
 }
 
 static struct kmem_cache *fat_inode_cachep;
@@ -675,28 +778,37 @@ static struct kmem_cache *fat_inode_cachep;
 static struct inode *fat_alloc_inode(struct super_block *sb)
 {
 	struct msdos_inode_info *ei;
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_inode: entering");
+        //printk(KERN_NOTICE "SEFT: fat_alloc_inode: allocating a new inode");
 	ei = kmem_cache_alloc(fat_inode_cachep, GFP_NOFS);
 	if (!ei)
 		return NULL;
 
 	init_rwsem(&ei->truncate_lock);
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_inode: exiting");
 	return &ei->vfs_inode;
 }
 
 static void fat_i_callback(struct rcu_head *head)
 {
 	struct inode *inode = container_of(head, struct inode, i_rcu);
+        printk(KERN_NOTICE "SEFT: fat_i_callback: entering");
 	kmem_cache_free(fat_inode_cachep, MSDOS_I(inode));
+        printk(KERN_NOTICE "SEFT: fat_i_callback: exiting");
 }
 
 static void fat_destroy_inode(struct inode *inode)
 {
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_destroy_inode: entering");
 	call_rcu(&inode->i_rcu, fat_i_callback);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_destroy_inode: exiting");
 }
 
 static void init_once(void *foo)
 {
 	struct msdos_inode_info *ei = (struct msdos_inode_info *)foo;
+
+        printk(KERN_NOTICE "SEFT: init_once: entering");
 
 	spin_lock_init(&ei->cache_lru_lock);
 	ei->nr_caches = 0;
@@ -705,6 +817,8 @@ static void init_once(void *foo)
 	INIT_HLIST_NODE(&ei->i_fat_hash);
 	INIT_HLIST_NODE(&ei->i_dir_hash);
 	inode_init_once(&ei->vfs_inode);
+
+        printk(KERN_NOTICE "SEFT: init_once: exiting\n");
 }
 
 static int __init fat_init_inodecache(void)
@@ -735,6 +849,8 @@ static int fat_remount(struct super_block *sb, int *flags, char *data)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	*flags |= MS_NODIRATIME | (sbi->options.isvfat ? 0 : MS_NOATIME);
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_remount: entering");
+
 	sync_filesystem(sb);
 
 	/* make sure we update state on remount. */
@@ -745,6 +861,8 @@ static int fat_remount(struct super_block *sb, int *flags, char *data)
 		else
 			fat_set_state(sb, 1, 1);
 	}
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_remount: exiting");
 	return 0;
 }
 
@@ -783,6 +901,8 @@ static int __fat_write_inode(struct inode *inode, int wait)
 	loff_t i_pos;
 	sector_t blocknr;
 	int err, offset;
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_write_inode: entering");
 
 	if (inode->i_ino == MSDOS_ROOT_INO)
 		return 0;
@@ -828,22 +948,29 @@ retry:
 	if (wait)
 		err = sync_dirty_buffer(bh);
 	brelse(bh);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_write_inode: exiting... err = 0x%x", err);
 	return err;
 }
 
 static int fat_write_inode(struct inode *inode, struct writeback_control *wbc)
 {
 	int err;
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_write_inode: entering");
 
 	if (inode->i_ino == MSDOS_FSINFO_INO) {
 		struct super_block *sb = inode->i_sb;
 
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_write_inode: calling fat_clusters_flush... MSDOS_FSINFO_INO");
 		mutex_lock(&MSDOS_SB(sb)->s_lock);
 		err = fat_clusters_flush(sb);
 		mutex_unlock(&MSDOS_SB(sb)->s_lock);
-	} else
+	} else {
+                fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_write_inode: calling __fat_write_inode... !MSDOS_FSINFO_INO");
 		err = __fat_write_inode(inode, wbc->sync_mode == WB_SYNC_ALL);
+        }
 
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_write_inode: exiting... err = 0x%x", err);
 	return err;
 }
 
@@ -1063,6 +1190,8 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	int option;
 	char *iocharset;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: parse_options: entering");
+
 	opts->isvfat = is_vfat;
 
 	opts->fs_uid = current_uid();
@@ -1088,6 +1217,7 @@ static int parse_options(struct super_block *sb, char *options, int is_vfat,
 	opts->errors = FAT_ERRORS_RO;
 #ifdef CONFIG_FS_SEFT
         /* Turn on SEFT by default when mounting */
+        fat_msg(sb, KERN_NOTICE, "SEFT: parse_options: setting opts->seft = 1");
         opts->seft = 1;
 #endif
 	*debug = 0;
@@ -1312,6 +1442,7 @@ out:
 		sb->s_export_op = &fat_export_ops_nostale;
 	}
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: parse_options: exiting");
 	return 0;
 }
 
@@ -1341,6 +1472,7 @@ static int fat_read_root(struct inode *inode)
 			   & ~((loff_t)sbi->cluster_size - 1)) >> 9;
 	MSDOS_I(inode)->i_logstart = 0;
 	MSDOS_I(inode)->mmu_private = inode->i_size;
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_read_root: setting mmu_private = 0x%llx", (long long)inode->i_size);
 
 	fat_save_attrs(inode, ATTR_DIR);
 	inode->i_mtime.tv_sec = inode->i_atime.tv_sec = inode->i_ctime.tv_sec = 0;
@@ -1542,6 +1674,9 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	int debug;
 	long error;
 	char buf[50];
+
+        //printk(KERN_NOTICE "SEFT: fat_fill_super: entering\n");
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_fill_super: entering\n");
 
 	/*
 	 * GFP_KERNEL is ok here, because while we do hold the
@@ -1797,14 +1932,18 @@ int fat_fill_super(struct super_block *sb, void *data, int silent, int isvfat,
 	}
 
 	fat_set_state(sb, 1, 0);
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_fill_super: exiting successfully");
 	return 0;
 
 out_invalid:
 	error = -EINVAL;
-	if (!silent)
+        // SEFT_RCROBLES
+	//if (!silent)
 		fat_msg(sb, KERN_INFO, "Can't find a valid FAT filesystem");
 
 out_fail:
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_fill_super: exiting with ERROR = 0x%lx", error);
+
 	if (fsinfo_inode)
 		iput(fsinfo_inode);
 	if (fat_inode)
@@ -1831,6 +1970,8 @@ static int writeback_inode(struct inode *inode)
 
 	int ret;
 
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: writeback_inode: entering... calling sync_inode_metadata");
+
 	/* if we used wait=1, sync_inode_metadata waits for the io for the
 	* inode to finish.  So wait=0 is sent down to sync_inode_metadata
 	* and filemap_fdatawrite is used for the data blocks
@@ -1838,6 +1979,8 @@ static int writeback_inode(struct inode *inode)
 	ret = sync_inode_metadata(inode, 0);
 	if (!ret)
 		ret = filemap_fdatawrite(inode->i_mapping);
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: writeback_inode: exiting... ret = 0x%x", ret);
 	return ret;
 }
 
@@ -1852,6 +1995,9 @@ static int writeback_inode(struct inode *inode)
 int fat_flush_inodes(struct super_block *sb, struct inode *i1, struct inode *i2)
 {
 	int ret = 0;
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_flush_inodes: entering");
+
 	if (!MSDOS_SB(sb)->options.flush)
 		return 0;
 	if (i1)
@@ -1862,6 +2008,8 @@ int fat_flush_inodes(struct super_block *sb, struct inode *i1, struct inode *i2)
 		struct address_space *mapping = sb->s_bdev->bd_inode->i_mapping;
 		ret = filemap_flush(mapping);
 	}
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_flush_inodes: exiting... ret = 0x%x", ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(fat_flush_inodes);
@@ -1869,6 +2017,8 @@ EXPORT_SYMBOL_GPL(fat_flush_inodes);
 static int __init init_fat_fs(void)
 {
 	int err;
+
+        printk(KERN_NOTICE "SEFT: init_fat_fs: entering");
 
 	err = fat_cache_init();
 	if (err)
@@ -1878,17 +2028,21 @@ static int __init init_fat_fs(void)
 	if (err)
 		goto failed;
 
+        printk(KERN_NOTICE "SEFT: init_fat_fs: exiting successfully\n");
 	return 0;
 
 failed:
 	fat_cache_destroy();
+        printk(KERN_NOTICE "SEFT: init_fat_fs: exiting with ERROR = 0x%x", err);
 	return err;
 }
 
 static void __exit exit_fat_fs(void)
 {
+        printk(KERN_NOTICE "SEFT: exit_fat_fs: entering");
 	fat_cache_destroy();
 	fat_destroy_inodecache();
+        printk(KERN_NOTICE "SEFT: exit_fat_fs: exiting");
 }
 
 module_init(init_fat_fs)

@@ -63,6 +63,8 @@ int fat_clusters_flush(struct super_block *sb)
 	struct buffer_head *bh;
 	struct fat_boot_fsinfo *fsinfo;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_clusters_flush: entering");
+
 	if (sbi->fat_bits != 32)
 		return 0;
 
@@ -89,6 +91,7 @@ int fat_clusters_flush(struct super_block *sb)
 	}
 	brelse(bh);
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_clusters_flush: exiting");
 	return 0;
 }
 

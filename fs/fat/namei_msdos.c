@@ -121,6 +121,9 @@ static int msdos_find(struct inode *dir, const unsigned char *name, int len,
 	unsigned char msdos_name[MSDOS_NAME];
 	int err;
 
+        //fat_msg(dir->i_sb, KERN_NOTICE, "SEFT: msdos_find: entering");
+        printk(KERN_NOTICE "SEFT: msdos_find: entering");
+
 	err = msdos_format_name(name, len, msdos_name, &sbi->options);
 	if (err)
 		return -ENOENT;
@@ -137,6 +140,9 @@ static int msdos_find(struct inode *dir, const unsigned char *name, int len,
 		if (err)
 			brelse(sinfo->bh);
 	}
+
+        //fat_msg(dir->i_sb, KERN_NOTICE, "SEFT: msdos_find: exiting... err = 0x%x", err);
+        printk(KERN_NOTICE "SEFT: msdos_find: exiting... err = 0x%x", err);
 	return err;
 }
 
@@ -204,6 +210,9 @@ static struct dentry *msdos_lookup(struct inode *dir, struct dentry *dentry,
 	struct inode *inode;
 	int err;
 
+        //fat_msg(dir->i_sb, KERN_NOTICE, "SEFT: msdos_lookup: entering");
+        printk(KERN_NOTICE "SEFT: msdos_lookup: entering");
+
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
 	err = msdos_find(dir, dentry->d_name.name, dentry->d_name.len, &sinfo);
 	switch (err) {
@@ -218,6 +227,9 @@ static struct dentry *msdos_lookup(struct inode *dir, struct dentry *dentry,
 		inode = ERR_PTR(err);
 	}
 	mutex_unlock(&MSDOS_SB(sb)->s_lock);
+
+        //fat_msg(dir->i_sb, KERN_NOTICE, "SEFT: msdos_lookup: exiting");
+        printk(KERN_NOTICE "SEFT: msdos_lookup: exiting");
 	return d_splice_alias(inode, dentry);
 }
 
@@ -230,6 +242,9 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 	struct msdos_dir_entry de;
 	__le16 time, date;
 	int err;
+
+        //fat_msg(dir->i_sb, KERN_NOTICE, "SEFT: msdos_add_entry: entering");
+        printk(KERN_NOTICE "SEFT: msdos_add_entry: entering");
 
 	memcpy(de.name, name, MSDOS_NAME);
 	de.attr = is_dir ? ATTR_DIR : ATTR_ARCH;
@@ -250,11 +265,15 @@ static int msdos_add_entry(struct inode *dir, const unsigned char *name,
 		return err;
 
 	dir->i_ctime = dir->i_mtime = *ts;
-	if (IS_DIRSYNC(dir))
+	if (IS_DIRSYNC(dir)) {
+                printk(KERN_NOTICE "SEFT: msdos_add_entry: calling fat_sync_inode");
 		(void)fat_sync_inode(dir);
-	else
-		mark_inode_dirty(dir);
+        } else {
+                printk(KERN_NOTICE "SEFT: msdos_add_entry: calling mark_inode_dirty");
+                mark_inode_dirty(dir);
+        }
 
+        printk(KERN_NOTICE "SEFT: msdos_add_entry: exiting");
 	return 0;
 }
 
@@ -268,6 +287,8 @@ static int msdos_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	struct timespec ts;
 	unsigned char msdos_name[MSDOS_NAME];
 	int err, is_hid;
+
+        printk(KERN_NOTICE "SEFT: msdos_create: entering");
 
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
 
@@ -287,6 +308,8 @@ static int msdos_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	err = msdos_add_entry(dir, msdos_name, 0, is_hid, 0, &ts, &sinfo);
 	if (err)
 		goto out;
+
+        printk(KERN_NOTICE "SEFT: msdos_create: calling fat_build_inode with de->size = 0x%x", sinfo.de->size);
 	inode = fat_build_inode(sb, sinfo.de, sinfo.i_pos);
 	brelse(sinfo.bh);
 	if (IS_ERR(inode)) {
@@ -299,6 +322,8 @@ static int msdos_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	d_instantiate(dentry, inode);
 out:
 	mutex_unlock(&MSDOS_SB(sb)->s_lock);
+
+        printk(KERN_NOTICE "SEFT: msdos_create: exiting... err = 0x%x", err);
 	if (!err)
 		err = fat_flush_inodes(sb, dir, inode);
 	return err;
@@ -350,6 +375,7 @@ static int msdos_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	struct timespec ts;
 	int err, is_hid, cluster;
 
+        printk(KERN_NOTICE "SEFT: msdos_mkdir: entering");
 	mutex_lock(&MSDOS_SB(sb)->s_lock);
 
 	err = msdos_format_name(dentry->d_name.name, dentry->d_name.len,
@@ -396,6 +422,7 @@ out_free:
 	fat_free_clusters(dir, cluster);
 out:
 	mutex_unlock(&MSDOS_SB(sb)->s_lock);
+        printk(KERN_NOTICE "SEFT: msdos_mkdir: exiting");
 	return err;
 }
 
@@ -647,6 +674,9 @@ static void setup(struct super_block *sb)
 
 static int msdos_fill_super(struct super_block *sb, void *data, int silent)
 {
+        // Super block not filled yet
+        printk(KERN_NOTICE "SEFT: msdos_fill_super: entering");
+        //fat_msg(sb, KERN_NOTICE, "SEFT: msdos_fill_super: entering");
 	return fat_fill_super(sb, data, silent, 0, setup);
 }
 
@@ -654,6 +684,9 @@ static struct dentry *msdos_mount(struct file_system_type *fs_type,
 			int flags, const char *dev_name,
 			void *data)
 {
+        // Don't have the suber block yet
+        printk(KERN_NOTICE "SEFT: msdos_mount: entering");
+        //fat_msg(sb, KERN_NOTICE, "SEFT: msdos_mount: entering");
 	return mount_bdev(fs_type, flags, dev_name, data, msdos_fill_super);
 }
 

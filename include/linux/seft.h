@@ -39,6 +39,7 @@ int seft_truncate_page(struct inode *, loff_t from, get_block_t);
 
 static inline bool vma_is_seft(struct vm_area_struct *vma)
 {
+        printk(KERN_NOTICE "SEFT: vma_is_seft: entering");
 	return vma->vm_file && IS_SEFT(vma->vm_file->f_mapping->host);
 }
 

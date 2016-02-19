@@ -36,6 +36,9 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 	struct block_device *bdev = inode->i_sb->s_bdev;
 	sector_t sector = block << (inode->i_blkbits - 9);
 
+        printk(KERN_NOTICE "SEFT: seft_clear_blocks: entering");
+        //printk(KERN_NOTICE "SEFT: seft_clear_blocks: block = 0x%x, size = 0x%x", block, size);
+
 	might_sleep();
 	do {
 		void __pmem *addr;
@@ -66,6 +69,8 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 	} while (size);
 
 	wmb_pmem();
+
+        printk(KERN_NOTICE "SEFT: seft_clear_blocks: exiting");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(seft_clear_blocks);
@@ -74,7 +79,12 @@ static long seft_get_addr(struct buffer_head *bh, void **addr, unsigned blkbits)
 {
 	unsigned long pfn;
 	sector_t sector = bh->b_blocknr << (blkbits - 9);
+
+        printk(KERN_NOTICE "SEFT: seft_get_addr: entering");
+        printk(KERN_NOTICE "SEFT: seft_get_addr: calling bdev_direct_access");
+        //printk(KERN_NOTICE "SEFT: seft_get_addr: sector = 0x%x, addr = 0x%x", sector, addr);
 	return bdev_direct_access(bh->b_bdev, sector, addr, &pfn, bh->b_size);
+        printk(KERN_NOTICE "SEFT: seft_get_addr: exiting");
 }
 
 /* the clear_pmem() calls are ordered by a wmb_pmem() in the caller */
@@ -82,6 +92,7 @@ static void seft_new_buf(void *addr, unsigned size, unsigned first, loff_t pos,
                         loff_t end)
 {
 	loff_t final = end - pos + first; /* The final byte of the buffer */
+        printk(KERN_NOTICE "SEFT: seft_new_buff: entering");
 
 	if (first > 0)
 		clear_pmem(addr, first);
@@ -92,10 +103,12 @@ static void seft_new_buf(void *addr, unsigned size, unsigned first, loff_t pos,
 //	if (final < size)
 //		memset(addr + final, 0, size - final);
 
+        printk(KERN_NOTICE "SEFT: seft_new_buff: exiting");
 }
 
 static bool buffer_written(struct buffer_head *bh)
 {
+        printk(KERN_NOTICE "SEFT: buffer_written: entering");
 	return buffer_mapped(bh) && !buffer_unwritten(bh);
 }
 
@@ -110,6 +123,7 @@ static bool buffer_written(struct buffer_head *bh)
  */
 static bool buffer_size_valid(struct buffer_head *bh)
 {
+        printk(KERN_NOTICE "SEFT: buffer_size_valid: entering");
 	return bh->b_state != 0;
 }
 
@@ -124,6 +138,8 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	void __pmem *addr;
 	bool hole = false;
 	bool need_wmb = false;
+
+        printk(KERN_NOTICE "SEFT: seft_io: entering");
 
 	if (iov_iter_rw(iter) != WRITE)
 		end = min(end, i_size_read(inode));
@@ -193,6 +209,7 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	if (need_wmb)
 		wmb_pmem();
 
+        printk(KERN_NOTICE "SEFT: seft_io: exiting");
 	return (pos == start) ? retval : pos - start;
 }
 
@@ -237,6 +254,8 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 
 	memset(&bh, 0, sizeof(bh));
 
+        printk(KERN_NOTICE "SEFT: seft_do_io: entering");
+
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ) {
 		struct address_space *mapping = inode->i_mapping;
 		mutex_lock(&inode->i_mutex);
@@ -262,6 +281,7 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 	if (!(flags & DIO_SKIP_DIO_COUNT))
 		inode_dio_end(inode);
  out:
+        printk(KERN_NOTICE "SEFT: seft_do_io: exiting");
 	return retval;
 }
 EXPORT_SYMBOL_GPL(seft_do_io);
@@ -279,6 +299,8 @@ static int seft_load_hole(struct address_space *mapping, struct page *page,
 {
 	unsigned long size;
 	struct inode *inode = mapping->host;
+
+        printk(KERN_NOTICE "SEFT: seft_load_hole: entering");
 
 	if (!page)
             page = find_or_create_page(mapping, vmf->pgoff,
@@ -305,12 +327,15 @@ static int copy_user_bh(struct page *to, struct buffer_head *bh,
 	void __pmem *vfrom;
 	void *vto;
 
+        printk(KERN_NOTICE "SEFT: copy_user_bh: entering");
+
 	if (seft_get_addr(bh, &vfrom, blkbits) < 0)
             return -EIO;
 
 	vto = kmap_atomic(to);
 	copy_user_page(vto, (void __force *)vfrom, vaddr, to);
 	kunmap_atomic(vto);
+        printk(KERN_NOTICE "SEFT: copy_user_bh: exiting");
 	return 0;
 }
 
@@ -324,6 +349,8 @@ static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
 	unsigned long pfn;
 	pgoff_t size;
 	int error;
+
+        printk(KERN_NOTICE "SEFT: seft_insert_mapping: entering");
 
 	i_mmap_lock_read(mapping);
 
@@ -358,6 +385,7 @@ static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
  out:
 	i_mmap_unlock_read(mapping);
 
+        printk(KERN_NOTICE "SEFT: seft_insert_mapping: exiting");
 	return error;
 }
 
@@ -393,6 +421,8 @@ int __seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	pgoff_t size;
 	int error;
 	int major = 0;
+
+        printk(KERN_NOTICE "SEFT: __seft_fault: entering");
 
 	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (vmf->pgoff >= size)
@@ -531,6 +561,8 @@ int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	int result;
 	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
 
+        printk(KERN_NOTICE "SEFT: seft_fault: entering");
+
 	if (vmf->flags & FAULT_FLAG_WRITE) {
 		sb_start_pagefault(sb);
 		file_update_time(vma->vm_file);
@@ -539,6 +571,7 @@ int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 	if (vmf->flags & FAULT_FLAG_WRITE)
 		sb_end_pagefault(sb);
 
+        printk(KERN_NOTICE "SEFT: seft_fault: exiting");
 	return result;
 }
 EXPORT_SYMBOL_GPL(seft_fault);
@@ -761,9 +794,12 @@ int seft_zero_page_range(struct inode *inode, loff_t from, unsigned length,
 	unsigned offset = from & (PAGE_CACHE_SIZE-1);
 	int err;
 
+        printk(KERN_NOTICE "SEFT: seft_zero_page_range: entering");
+
 	/* Block boundary? Nothing to do */
 	if (!length)
 		return 0;
+
 	BUG_ON((offset + length) > PAGE_CACHE_SIZE);
 
 	memset(&bh, 0, sizeof(bh));
@@ -804,6 +840,7 @@ EXPORT_SYMBOL_GPL(seft_zero_page_range);
 int seft_truncate_page(struct inode *inode, loff_t from, get_block_t get_block)
 {
 	unsigned length = PAGE_CACHE_ALIGN(from) - from;
+        printk(KERN_NOTICE "SEFT: seft_truncate: entering");
 	return seft_zero_page_range(inode, from, length, get_block);
 }
 EXPORT_SYMBOL_GPL(seft_truncate_page);

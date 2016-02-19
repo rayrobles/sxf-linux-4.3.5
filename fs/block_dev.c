@@ -160,6 +160,7 @@ blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
             return dax_do_io(iocb, inode, iter, offset, blkdev_get_block,
                              NULL, DIO_SKIP_DIO_COUNT);
         } else if (IS_SEFT(inode)) {
+            printk(KERN_NOTICE "SEFT: blkdev_direct_IO: calling seft_do_io");
             return seft_do_io(iocb, inode, iter, offset, blkdev_get_block,
                               NULL, DIO_SKIP_DIO_COUNT);
         } else {
@@ -455,6 +456,8 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
 	long avail;
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
 
+        printk(KERN_NOTICE "SEFT: bdev_direct_access: entering");
+
 	/*
 	 * The device driver is allowed to sleep, in order to make the
 	 * memory directly accessible.
@@ -488,8 +491,13 @@ static struct kmem_cache * bdev_cachep __read_mostly;
 static struct inode *bdev_alloc_inode(struct super_block *sb)
 {
 	struct bdev_inode *ei = kmem_cache_alloc(bdev_cachep, GFP_KERNEL);
+
+        printk(KERN_NOTICE "SEFT: bdev_alloc_inode: entering");
+
 	if (!ei)
 		return NULL;
+
+        printk(KERN_NOTICE "SEFT: bdev_alloc_inode: exiting");
 	return &ei->vfs_inode;
 }
 
@@ -1624,6 +1632,8 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct blk_plug plug;
 	ssize_t ret;
 
+        printk(KERN_NOTICE "SEFT: blkdev_write_iter: entering");
+
 	if (bdev_read_only(I_BDEV(bd_inode)))
 		return -EPERM;
 
@@ -1644,6 +1654,8 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			ret = err;
 	}
 	blk_finish_plug(&plug);
+
+        printk(KERN_NOTICE "SEFT: blkdev_write_iter: exiting... ret = 0x%zx", ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(blkdev_write_iter);

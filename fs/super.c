@@ -970,6 +970,8 @@ struct dentry *mount_bdev(struct file_system_type *fs_type,
 	fmode_t mode = FMODE_READ | FMODE_EXCL;
 	int error = 0;
 
+        printk("mount_bdev: entering");
+
 	if (!(flags & MS_RDONLY))
 		mode |= FMODE_WRITE;
 
