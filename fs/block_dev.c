@@ -390,8 +390,10 @@ int bdev_read_page(struct block_device *bdev, sector_t sector,
 			struct page *page)
 {
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
-	if (!ops->rw_page || bdev_get_integrity(bdev))
+	if (!ops->rw_page || bdev_get_integrity(bdev)) {
+                printk(KERN_NOTICE "SEFT: bdev_read_page: AM I HERE (4)??? *******************************************************");
 		return -EOPNOTSUPP;
+        }
 	return ops->rw_page(bdev, sector + get_start_sect(bdev), page, READ);
 }
 EXPORT_SYMBOL_GPL(bdev_read_page);
@@ -421,8 +423,10 @@ int bdev_write_page(struct block_device *bdev, sector_t sector,
 	int result;
 	int rw = (wbc->sync_mode == WB_SYNC_ALL) ? WRITE_SYNC : WRITE;
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
-	if (!ops->rw_page || bdev_get_integrity(bdev))
+	if (!ops->rw_page || bdev_get_integrity(bdev)) {
+                printk(KERN_NOTICE "SEFT: bdev_write_page: AM I HERE (5)??? *******************************************************");
 		return -EOPNOTSUPP;
+        }
 	set_page_writeback(page);
 	result = ops->rw_page(bdev, sector + get_start_sect(bdev), page, rw);
 	if (result)
@@ -466,17 +470,46 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
 
 	if (size < 0)
 		return size;
-	if (!ops->direct_access)
+	if (!ops->direct_access) {
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: block_device_operations does not support direct_access\n");
 		return -EOPNOTSUPP;
-	if ((sector + DIV_ROUND_UP(size, 512)) >
-					part_nr_sects_read(bdev->bd_part))
+        }
+
+	if ((sector + DIV_ROUND_UP(size, 512)) > part_nr_sects_read(bdev->bd_part)) {
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: sector (rounded up) > part_nr_sects_read\n");
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx\n",
+                       (unsigned long long)sector);
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: DIV_ROUND_UP(size, 512) = 0x%lx\n",
+                       DIV_ROUND_UP(size, 512));
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: part_nr_sects_read(bdev->bd_part) = 0x%llx\n",
+                       (unsigned long long)part_nr_sects_read(bdev->bd_part));
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -ERANGE (-34)\n");
 		return -ERANGE;
+        }
+
 	sector += get_start_sect(bdev);
-	if (sector % (PAGE_SIZE / 512))
+	if (sector % (PAGE_SIZE / 512)) {
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: sector mod (PAGE_SIZE / 512)\n");
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx, PAGE_SIZE = 0x%lx\n",
+                       (unsigned long long)sector, PAGE_SIZE);
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: get_start_sect(bdev) = 0x%llx\n",
+                       (unsigned long long)get_start_sect(bdev));
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: part_nr_sects_read(bdev) = 0x%llx\n",
+                       (unsigned long long)part_nr_sects_read(bdev->bd_part));
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: *addr 0x%llx, *pfn 0x%lx, size 0x%lx\n",
+                       (unsigned long long)*addr, *pfn, size);
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -EINVAL (-22)\n");
 		return -EINVAL;
+        }
+
 	avail = ops->direct_access(bdev, sector, addr, pfn);
-	if (!avail)
+	if (!avail) {
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: (!avail)\n");
+                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -ERANGE (-34)\n");
 		return -ERANGE;
+        }
+
+        printk(KERN_NOTICE "SEFT: bdev_direct_access: returning... min(avail, size) = 0x%lx\n", min(avail, size));
 	return min(avail, size);
 }
 EXPORT_SYMBOL_GPL(bdev_direct_access);

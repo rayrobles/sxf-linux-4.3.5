@@ -3270,6 +3270,7 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
 	if (error)
 		goto out2;
 	if (!dir->i_op->tmpfile) {
+            printk(KERN_NOTICE "SEFT: do_tmpfile: AM I HERE (1)??? *******************************************************");
 		error = -EOPNOTSUPP;
 		goto out2;
 	}

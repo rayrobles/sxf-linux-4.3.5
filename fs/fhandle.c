@@ -26,8 +26,10 @@ static long do_sys_name_to_handle(struct path *path,
 	 * support decoding of the file handle
 	 */
 	if (!path->dentry->d_sb->s_export_op ||
-	    !path->dentry->d_sb->s_export_op->fh_to_dentry)
+	    !path->dentry->d_sb->s_export_op->fh_to_dentry) {
+		printk(KERN_NOTICE "SEFT: do_tmpfile: AM I HERE (2)??? *******************************************************");
 		return -EOPNOTSUPP;
+	}
 
 	if (copy_from_user(&f_handle, ufh, sizeof(struct file_handle)))
 		return -EFAULT;

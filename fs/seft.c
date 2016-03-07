@@ -81,10 +81,10 @@ static long seft_get_addr(struct buffer_head *bh, void **addr, unsigned blkbits)
 	sector_t sector = bh->b_blocknr << (blkbits - 9);
 
         printk(KERN_NOTICE "SEFT: seft_get_addr: entering");
+        printk(KERN_NOTICE "SEFT: seft_get_addr: bh->b_blocknr = 0x%llx, blkbits = 0x%x, bh->b_size - 0x%zx",
+               (unsigned long long)bh->b_blocknr, blkbits, bh->b_size);
         printk(KERN_NOTICE "SEFT: seft_get_addr: calling bdev_direct_access");
-        //printk(KERN_NOTICE "SEFT: seft_get_addr: sector = 0x%x, addr = 0x%x", sector, addr);
 	return bdev_direct_access(bh->b_bdev, sector, addr, &pfn, bh->b_size);
-        printk(KERN_NOTICE "SEFT: seft_get_addr: exiting");
 }
 
 /* the clear_pmem() calls are ordered by a wmb_pmem() in the caller */
@@ -139,7 +139,9 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	bool hole = false;
 	bool need_wmb = false;
 
-        printk(KERN_NOTICE "SEFT: seft_io: entering");
+        printk(KERN_NOTICE "SEFT: seft_io: entering\n");
+        printk(KERN_NOTICE "SEFT: seft_io: start = 0x%llx", (unsigned long long)start);
+        printk(KERN_NOTICE "SEFT: seft_io: end = 0x%llx", (unsigned long long)end);
 
 	if (iov_iter_rw(iter) != WRITE)
 		end = min(end, i_size_read(inode));
@@ -153,22 +155,38 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 			unsigned first = pos - (block << blkbits);
 			long size;
 
+                        printk(KERN_NOTICE "SEFT: seft_io: blkbits = 0x%x", blkbits);
+                        printk(KERN_NOTICE "SEFT: seft_io: page = 0x%lx", page);
+                        printk(KERN_NOTICE "SEFT: seft_io: block = 0x%llx", (unsigned long long)block);
+                        printk(KERN_NOTICE "SEFT: seft_io: first = 0x%llx", (unsigned long long)first);
+
 			if (pos == bh_max) {
 				bh->b_size = PAGE_ALIGN(end - pos);
 				bh->b_state = 0;
+
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (1) = 0x%zx", bh->b_size);
+
 				retval = get_block(inode, block, bh,
 						   iov_iter_rw(iter) == WRITE);
 				if (retval)
 					break;
+
 				if (!buffer_size_valid(bh))
 					bh->b_size = 1 << blkbits;
+
 				bh_max = pos - first + bh->b_size;
+
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (2) = 0x%zx", bh->b_size);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_blocknr = 0x%llx", (unsigned long long)bh->b_blocknr);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh_max = 0x%llx", (unsigned long long)bh_max);
+
 			} else {
 				unsigned done = bh->b_size -
 						(bh_max - (pos - first));
 				bh->b_blocknr += done >> blkbits;
 				bh->b_size -= done;
 			}
+
 
 			hole = iov_iter_rw(iter) != WRITE && !buffer_written(bh);
 			if (hole) {
@@ -209,7 +227,7 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	if (need_wmb)
 		wmb_pmem();
 
-        printk(KERN_NOTICE "SEFT: seft_io: exiting");
+        printk(KERN_NOTICE "SEFT: seft_io: exiting\n");
 	return (pos == start) ? retval : pos - start;
 }
 
@@ -254,7 +272,7 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 
 	memset(&bh, 0, sizeof(bh));
 
-        printk(KERN_NOTICE "SEFT: seft_do_io: entering");
+        printk(KERN_NOTICE "SEFT: seft_do_io: entering\n");
 
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ) {
 		struct address_space *mapping = inode->i_mapping;
@@ -281,7 +299,7 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 	if (!(flags & DIO_SKIP_DIO_COUNT))
 		inode_dio_end(inode);
  out:
-        printk(KERN_NOTICE "SEFT: seft_do_io: exiting");
+        printk(KERN_NOTICE "SEFT: seft_do_io: exiting... retval = 0x%zx\n", retval);
 	return retval;
 }
 EXPORT_SYMBOL_GPL(seft_do_io);
@@ -408,7 +426,7 @@ static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
  * to proceed successfully. 
  */
 int __seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
-                 get_block_t get_block, dax_iodone_t complete_unwritten)
+                 get_block_t get_block, seft_iodone_t complete_unwritten)
 {
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
@@ -556,7 +574,7 @@ EXPORT_SYMBOL_GPL(__seft_fault);
  * fault handler for SEFT files.
  */
 int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
-               get_block_t get_block, dax_iodone_t complete_unwritten)
+               get_block_t get_block, seft_iodone_t complete_unwritten)
 {
 	int result;
 	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
@@ -577,7 +595,9 @@ int seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf,
 EXPORT_SYMBOL_GPL(seft_fault);
 
 
-#if 0
+//#if 0
+#if 1
+
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
 /*
  * The 'colour' (ie low bits) within a PMD of a page offset.  This comes up
@@ -585,9 +605,9 @@ EXPORT_SYMBOL_GPL(seft_fault);
  */
 #define PG_PMD_COLOUR	((PMD_SIZE >> PAGE_SHIFT) - 1)
 
-int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
-		pmd_t *pmd, unsigned int flags, get_block_t get_block,
-		dax_iodone_t complete_unwritten)
+int __seft_pmd_fault(struct vm_area_struct *vma, unsigned long address,
+                     pmd_t *pmd, unsigned int flags, get_block_t get_block,
+                     seft_iodone_t complete_unwritten)
 {
 	struct file *file = vma->vm_file;
 	struct address_space *mapping = file->f_mapping;
@@ -603,12 +623,16 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	unsigned long pfn;
 	int result = 0;
 
+        printk(KERN_NOTICE "SEFT: __seft_pmd_fault: entering... \n");
+
 	/* Fall back to PTEs if we're going to COW */
 	if (write && !(vma->vm_flags & VM_SHARED))
 		return VM_FAULT_FALLBACK;
+
 	/* If the PMD would extend outside the VMA */
 	if (pmd_addr < vma->vm_start)
 		return VM_FAULT_FALLBACK;
+
 	if ((pmd_addr + PMD_SIZE) > vma->vm_end)
 		return VM_FAULT_FALLBACK;
 
@@ -616,6 +640,7 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	size = (i_size_read(inode) + PAGE_SIZE - 1) >> PAGE_SHIFT;
 	if (pgoff >= size)
 		return VM_FAULT_SIGBUS;
+
 	/* If the PMD would cover blocks out of the file */
 	if ((pgoff | PG_PMD_COLOUR) >= size)
 		return VM_FAULT_FALLBACK;
@@ -627,6 +652,7 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	length = get_block(inode, block, &bh, write);
 	if (length)
 		return VM_FAULT_SIGBUS;
+
 	i_mmap_lock_read(mapping);
 
 	/*
@@ -658,6 +684,7 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 		result = VM_FAULT_SIGBUS;
 		goto out;
 	}
+
 	if ((pgoff | PG_PMD_COLOUR) >= size)
 		goto fallback;
 
@@ -683,11 +710,12 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	} else {
 		sector = bh.b_blocknr << (blkbits - 9);
 		length = bdev_direct_access(bh.b_bdev, sector, &kaddr, &pfn,
-						bh.b_size);
+                                            bh.b_size);
 		if (length < 0) {
 			result = VM_FAULT_SIGBUS;
 			goto out;
 		}
+
 		if ((length < PMD_SIZE) || (pfn & PG_PMD_COLOUR))
 			goto fallback;
 
@@ -704,67 +732,75 @@ int __dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 		result |= vmf_insert_pfn_pmd(vma, address, pmd, pfn, write);
 	}
 
- out:
+out:
 	i_mmap_unlock_read(mapping);
 
 	if (buffer_unwritten(&bh))
 		complete_unwritten(&bh, !(result & VM_FAULT_ERROR));
 
+        printk(KERN_NOTICE "SEFT: __seft_pmd_fault: exiting... result = 0x%x\n", result);
 	return result;
 
- fallback:
+fallback:
 	count_vm_event(THP_FAULT_FALLBACK);
 	result = VM_FAULT_FALLBACK;
 	goto out;
 }
-EXPORT_SYMBOL_GPL(__dax_pmd_fault);
+EXPORT_SYMBOL_GPL(__seft_pmd_fault);
 
 /**
- * dax_pmd_fault - handle a PMD fault on a DAX file
+ * seft_pmd_fault - handle a PMD fault on a seft file
  * @vma: The virtual memory area where the fault occurred
  * @vmf: The description of the fault
  * @get_block: The filesystem method used to translate file offsets to blocks
  *
  * When a page fault occurs, filesystems may call this helper in their
- * pmd_fault handler for DAX files.
+ * pmd_fault handler for SEFT files.
  */
-int dax_pmd_fault(struct vm_area_struct *vma, unsigned long address,
-			pmd_t *pmd, unsigned int flags, get_block_t get_block,
-			dax_iodone_t complete_unwritten)
+int seft_pmd_fault(struct vm_area_struct *vma, unsigned long address,
+                   pmd_t *pmd, unsigned int flags, get_block_t get_block,
+                   seft_iodone_t complete_unwritten)
 {
 	int result;
 	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
+
+        printk(KERN_NOTICE "SEFT: seft_pmd_fault: entering...\n");
 
 	if (flags & FAULT_FLAG_WRITE) {
 		sb_start_pagefault(sb);
 		file_update_time(vma->vm_file);
 	}
-	result = __dax_pmd_fault(vma, address, pmd, flags, get_block,
-				complete_unwritten);
+
+	result = __seft_pmd_fault(vma, address, pmd, flags, get_block, complete_unwritten);
 	if (flags & FAULT_FLAG_WRITE)
 		sb_end_pagefault(sb);
 
+        printk(KERN_NOTICE "SEFT: seft_pmd_fault: exiting... result = 0x%x\n", result);
 	return result;
 }
-EXPORT_SYMBOL_GPL(dax_pmd_fault);
+EXPORT_SYMBOL_GPL(seft_pmd_fault);
 #endif /* CONFIG_TRANSPARENT_HUGEPAGE */
 
 /**
- * dax_pfn_mkwrite - handle first write to DAX page
+ * seft_pfn_mkwrite - handle first write to DAX page
  * @vma: The virtual memory area where the fault occurred
  * @vmf: The description of the fault
  *
  */
-int dax_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
+int seft_pfn_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
 	struct super_block *sb = file_inode(vma->vm_file)->i_sb;
+
+        printk(KERN_NOTICE "SEFT: seft_pfn_mkwrite: entering...\n");
 
 	sb_start_pagefault(sb);
 	file_update_time(vma->vm_file);
 	sb_end_pagefault(sb);
+
+        printk(KERN_NOTICE "SEFT: seft_pfn_mkwrite: exiting... returning = VM_FAULT_NOPAGE\n");
 	return VM_FAULT_NOPAGE;
 }
-EXPORT_SYMBOL_GPL(dax_pfn_mkwrite);
+EXPORT_SYMBOL_GPL(seft_pfn_mkwrite);
 #endif
 
 /**

@@ -203,45 +203,40 @@ int fat_get_block(struct inode *inode, sector_t iblock,
 
 static int fat_writepage(struct page *page, struct writeback_control *wbc)
 {
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_writepage: entering");
-        printk(KERN_NOTICE "SEFT: fat_writepage: entering");
+        printk(KERN_NOTICE "SEFT: fat_writepage: entering... returning block_write_full_page");
 	return block_write_full_page(page, fat_get_block, wbc);
 }
 
 static int fat_writepages(struct address_space *mapping,
 			  struct writeback_control *wbc)
 {
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_writepages: entering");
-        printk(KERN_NOTICE "SEFT: fat_writepages: entering");
+        printk(KERN_NOTICE "SEFT: fat_writepages: entering... returning mpage_writepages");
 	return mpage_writepages(mapping, wbc, fat_get_block);
 }
 
 static int fat_readpage(struct file *file, struct page *page)
 {
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_readpage: entering");
-        printk(KERN_NOTICE "SEFT: fat_readpage: entering");
+        printk(KERN_NOTICE "SEFT: fat_readpage: entering... returning mpage_readpage");
 	return mpage_readpage(page, fat_get_block);
 }
 
 static int fat_readpages(struct file *file, struct address_space *mapping,
 			 struct list_head *pages, unsigned nr_pages)
 {
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_readpages: entering");
-        printk(KERN_NOTICE "SEFT: fat_readpages: entering");
+        printk(KERN_NOTICE "SEFT: fat_readpages: entering... returning mpage_readpages");
 	return mpage_readpages(mapping, pages, nr_pages, fat_get_block);
 }
 
 static void fat_write_failed(struct address_space *mapping, loff_t to)
 {
 	struct inode *inode = mapping->host;
-
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_failed: entering");
         printk(KERN_NOTICE "SEFT: fat_write_failed: entering");
 
 	if (to > inode->i_size) {
 		truncate_pagecache(inode, inode->i_size);
 		fat_truncate_blocks(inode, inode->i_size);
 	}
+        printk(KERN_NOTICE "SEFT: fat_write_failed: exiting");
 }
 
 static int fat_write_begin(struct file *file, struct address_space *mapping,
@@ -251,7 +246,6 @@ static int fat_write_begin(struct file *file, struct address_space *mapping,
 	int err;
 	*pagep = NULL;
 
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_begin: entering");
         printk(KERN_NOTICE "SEFT: fat_write_begin: entering");
 
 	err = cont_write_begin(file, mapping, pos, len, flags,
@@ -259,6 +253,8 @@ static int fat_write_begin(struct file *file, struct address_space *mapping,
 				&MSDOS_I(mapping->host)->mmu_private);
 	if (err < 0)
 		fat_write_failed(mapping, pos + len);
+
+        printk(KERN_NOTICE "SEFT: fat_write_begin: exiting... returning err = 0x%x", err);
 	return err;
 }
 
@@ -269,7 +265,6 @@ static int fat_write_end(struct file *file, struct address_space *mapping,
 	struct inode *inode = mapping->host;
 	int err;
 
-        //fat_msg(sb, KERN_NOTICE, "SEFT: fat_write_end: entering");
         printk(KERN_NOTICE "SEFT: fat_write_end: entering");
 
 	err = generic_write_end(file, mapping, pos, len, copied, pagep, fsdata);
@@ -280,6 +275,7 @@ static int fat_write_end(struct file *file, struct address_space *mapping,
 		MSDOS_I(inode)->i_attrs |= ATTR_ARCH;
 		mark_inode_dirty(inode);
 	}
+        printk(KERN_NOTICE "SEFT: fat_write_end: exiting... returning err = 0x%x", err);
 	return err;
 }
 
@@ -368,7 +364,7 @@ static sector_t _fat_bmap(struct address_space *mapping, sector_t block)
 	blocknr = generic_block_bmap(mapping, block, fat_get_block);
 	up_read(&MSDOS_I(mapping->host)->truncate_lock);
 
-        //fat_msg(mapping->host->i_sb, KERN_NOTICE, "SEFT: fat_bmap: exiting... blocknr = 0x%llx", blocknr);
+        fat_msg(mapping->host->i_sb, KERN_NOTICE, "SEFT: _fat_bmap: exiting... blocknr = 0x%llx", (unsigned long long)blocknr);
 	return blocknr;
 }
 

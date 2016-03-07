@@ -24,11 +24,11 @@ static int fat_seft_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	return seft_fault(vma, vmf, fat_get_block, NULL);
 }
 
-//static int fat_seft_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
-//                              pmd_t *pmd, unsigned int flags)
-//{
-//	return seft_pmd_fault(vma, addr, pmd, flags, ext2_get_block, NULL);
-//}
+static int fat_seft_pmd_fault(struct vm_area_struct *vma, unsigned long addr,
+                              pmd_t *pmd, unsigned int flags)
+{
+	return seft_pmd_fault(vma, addr, pmd, flags, fat_get_block, NULL);
+}
 
 static int fat_seft_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 {
@@ -37,9 +37,9 @@ static int fat_seft_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 static const struct vm_operations_struct fat_seft_vm_ops = {
 	.fault		= fat_seft_fault,
+        .pmd_fault	= fat_seft_pmd_fault,
 	.page_mkwrite	= fat_seft_mkwrite,
-//      .pmd_fault	= ext2_dax_pmd_fault,
-//	.pfn_mkwrite	= dax_pfn_mkwrite,
+        .pfn_mkwrite	= seft_pfn_mkwrite,
 };
 
 static int seft_file_mmap(struct file *file, struct vm_area_struct *vma)
@@ -50,8 +50,8 @@ static int seft_file_mmap(struct file *file, struct vm_area_struct *vma)
 
 	file_accessed(file);
 	vma->vm_ops = &fat_seft_vm_ops;
-	//vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
-	vma->vm_flags |= VM_MIXEDMAP;
+	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
+	//vma->vm_flags |= VM_MIXEDMAP;
         fat_msg(file->f_mapping->host->i_sb, KERN_NOTICE, "SEFT: seft_file_mmap: exiting");
 	return 0;
 }
