@@ -26,22 +26,26 @@
 #include <linux/memcontrol.h>
 #include <linux/mm.h>
 #include <linux/mutex.h>
-#include <linux/pmem.h>
+//#include <linux/pmem.h>
 #include <linux/sched.h>
 #include <linux/uio.h>
 #include <linux/vmstat.h>
+
+/* 1MB Buffer for SEFT I/O Testing  */
+unsigned char ray_buf[1* 1024 * 1024];
 
 int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 {
 	struct block_device *bdev = inode->i_sb->s_bdev;
 	sector_t sector = block << (inode->i_blkbits - 9);
 
-        printk(KERN_NOTICE "SEFT: seft_clear_blocks: entering");
+        printk(KERN_NOTICE "SEFT: seft_clear_blocks: entering\n");
         //printk(KERN_NOTICE "SEFT: seft_clear_blocks: block = 0x%x, size = 0x%x", block, size);
 
 	might_sleep();
 	do {
-		void __pmem *addr;
+		//void __pmem *addr;
+		void *addr;
 		unsigned long pfn;
 		long count;
 
@@ -55,10 +59,18 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 		while (count > 0) {
 			unsigned pgsz = PAGE_SIZE - offset_in_page(addr);
 
-			if (pgsz > count)
+			if (pgsz > count) {
 				pgsz = count;
+                        }
 
-			clear_pmem(addr, pgsz);
+                        if (pgsz < PAGE_SIZE) {
+                                memset(addr, 0, pgsz);
+                        } else {
+                                clear_page(addr);
+                        }
+
+                        //clear_pmem(addr, pgsz);
+
 			addr += pgsz;
 			size -= pgsz;
 			count -= pgsz;
@@ -68,9 +80,9 @@ int seft_clear_blocks(struct inode *inode, sector_t block, long size)
 		}
 	} while (size);
 
-	wmb_pmem();
+	//wmb_pmem();
 
-        printk(KERN_NOTICE "SEFT: seft_clear_blocks: exiting");
+        printk(KERN_NOTICE "SEFT: seft_clear_blocks: exiting\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(seft_clear_blocks);
@@ -80,10 +92,10 @@ static long seft_get_addr(struct buffer_head *bh, void **addr, unsigned blkbits)
 	unsigned long pfn;
 	sector_t sector = bh->b_blocknr << (blkbits - 9);
 
-        printk(KERN_NOTICE "SEFT: seft_get_addr: entering");
-        printk(KERN_NOTICE "SEFT: seft_get_addr: bh->b_blocknr = 0x%llx, blkbits = 0x%x, bh->b_size - 0x%zx",
+        printk(KERN_NOTICE "SEFT: seft_get_addr: entering\n");
+        printk(KERN_NOTICE "SEFT: seft_get_addr: bh->b_blocknr = 0x%llx, blkbits = 0x%x, bh->b_size - 0x%zx\n",
                (unsigned long long)bh->b_blocknr, blkbits, bh->b_size);
-        printk(KERN_NOTICE "SEFT: seft_get_addr: calling bdev_direct_access");
+        printk(KERN_NOTICE "SEFT: seft_get_addr: calling bdev_direct_access\n");
 	return bdev_direct_access(bh->b_bdev, sector, addr, &pfn, bh->b_size);
 }
 
@@ -92,23 +104,23 @@ static void seft_new_buf(void *addr, unsigned size, unsigned first, loff_t pos,
                         loff_t end)
 {
 	loff_t final = end - pos + first; /* The final byte of the buffer */
-        printk(KERN_NOTICE "SEFT: seft_new_buff: entering");
+        printk(KERN_NOTICE "SEFT: seft_new_buff: entering\n");
 
+	//if (first > 0)
+	//	clear_pmem(addr, first);
+	//if (final < size)
+	//	clear_pmem(addr + final, size - final);
 	if (first > 0)
-		clear_pmem(addr, first);
+		memset(addr, 0, first);
 	if (final < size)
-		clear_pmem(addr + final, size - final);
-//	if (first > 0)
-//		memset(addr, 0, first);
-//	if (final < size)
-//		memset(addr + final, 0, size - final);
+		memset(addr + final, 0, size - final);
 
-        printk(KERN_NOTICE "SEFT: seft_new_buff: exiting");
+        printk(KERN_NOTICE "SEFT: seft_new_buff: exiting\n");
 }
 
 static bool buffer_written(struct buffer_head *bh)
 {
-        printk(KERN_NOTICE "SEFT: buffer_written: entering");
+        printk(KERN_NOTICE "SEFT: buffer_written: entering\n");
 	return buffer_mapped(bh) && !buffer_unwritten(bh);
 }
 
@@ -123,7 +135,7 @@ static bool buffer_written(struct buffer_head *bh)
  */
 static bool buffer_size_valid(struct buffer_head *bh)
 {
-        printk(KERN_NOTICE "SEFT: buffer_size_valid: entering");
+        printk(KERN_NOTICE "SEFT: buffer_size_valid: entering\n");
 	return bh->b_state != 0;
 }
 
@@ -135,19 +147,34 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 	loff_t pos = start;
 	loff_t max = start;
 	loff_t bh_max = start;
-	void __pmem *addr;
+	//void __pmem *addr;
+	void *addr;
 	bool hole = false;
-	bool need_wmb = false;
+	//bool need_wmb = false;
 
         printk(KERN_NOTICE "SEFT: seft_io: entering\n");
         printk(KERN_NOTICE "SEFT: seft_io: start = 0x%llx", (unsigned long long)start);
         printk(KERN_NOTICE "SEFT: seft_io: end = 0x%llx", (unsigned long long)end);
+        printk(KERN_NOTICE "SEFT: seft_io: iter->count = 0x%zx", iter->count);
 
 	if (iov_iter_rw(iter) != WRITE)
 		end = min(end, i_size_read(inode));
 
+        /* Zero out temp SEFT buffer */
+        memset(ray_buf, 0, sizeof(ray_buf));
+
 	while (pos < end) {
-		size_t len;
+
+            size_t len;
+
+            printk(KERN_NOTICE "SEFT: seft_io: while (pos < end) entering...\n");
+            printk(KERN_NOTICE "SEFT: seft_io: pos = 0x%llx ********** while loop\n",
+                   (unsigned long long)pos);
+            printk(KERN_NOTICE "SEFT: seft_io: end = 0x%llx ********** while loop\n",
+                   (unsigned long long)end);
+            printk(KERN_NOTICE "SEFT: seft_io: max = 0x%llx ********** while loop\n",
+                   (unsigned long long)max);
+
 		if (pos == max) {
 			unsigned blkbits = inode->i_blkbits;
 			long page = pos >> PAGE_SHIFT;
@@ -155,79 +182,190 @@ static ssize_t seft_io(struct inode *inode, struct iov_iter *iter,
 			unsigned first = pos - (block << blkbits);
 			long size;
 
-                        printk(KERN_NOTICE "SEFT: seft_io: blkbits = 0x%x", blkbits);
-                        printk(KERN_NOTICE "SEFT: seft_io: page = 0x%lx", page);
-                        printk(KERN_NOTICE "SEFT: seft_io: block = 0x%llx", (unsigned long long)block);
-                        printk(KERN_NOTICE "SEFT: seft_io: first = 0x%llx", (unsigned long long)first);
+                        printk(KERN_NOTICE "SEFT: seft_io: (pos == max) ********** while loop\n");
+                        printk(KERN_NOTICE "SEFT: seft_io: block = 0x%llx ********** while loop\n",
+                               (unsigned long long)block);
+                        printk(KERN_NOTICE "SEFT: seft_io: first = 0x%llx ********** while loop\n",
+                               (unsigned long long)first);
 
 			if (pos == bh_max) {
 				bh->b_size = PAGE_ALIGN(end - pos);
 				bh->b_state = 0;
 
-                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (1) = 0x%zx", bh->b_size);
+                                printk(KERN_NOTICE "SEFT: seft_io: (pos == bh_max) ********** while loop\n");
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (1) = 0x%zx ********** while loop",
+                                       bh->b_size);
 
+
+                                /* 
+                                 * Calling get_block will call the following functions: 
+                                 *  
+                                 *   - fat_get_block()
+                                 *   - __fat_get_block()
+                                 *   - fat_bmap() ...first time with mmu_private = 0
+                                 *   - fat_add_cluster()
+                                 *   - fat_alloc_cluster()
+                                 *   - fat_chain_add()
+                                 *     - investigate how return values of fat_chain_add make mmu_private = 0x800
+                                 *     - for seft io, we need this value to always be 0x1000 (4k)
+                                 *   - <then mmu_private gets updated to 0x800 (for the 2k cluster... 4 blocks)...>
+                                 *   - fat_bmap() ...second time with mmu_private = 0x800
+                                 *   - fat_bmap_cluster()
+                                 *   - fat_get_cluster()
+                                 *   - fat_clus_to_blknr()
+                                 *   - <*phys and *mapped blocks get updated...>
+                                 *
+                                 *
+                                 *   bh->b_size = (*mapped_blocks * 512) = 2K (1 cluster)... need to make this 2 clusters
+                                 *   bh->b_blocknr = (*phys ) = 0x12x or 0x13x
+                                 *  
+                                 */
 				retval = get_block(inode, block, bh,
 						   iov_iter_rw(iter) == WRITE);
-				if (retval)
+				if (retval){
+                                        printk(KERN_NOTICE "SEFT: seft_io: retval... break... ********** while loop\n");
 					break;
+                                }
 
-				if (!buffer_size_valid(bh))
+				if (!buffer_size_valid(bh)) {
+                                        printk(KERN_NOTICE "SEFT: seft_io: !buffer_size_valid(bh) ********** while loop\n");
 					bh->b_size = 1 << blkbits;
+                                        printk(KERN_NOTICE "SEFT: seft_io: bh->b_size = 0x%zx ********** while loop\n",
+                                               bh->b_size);
+                                }
 
 				bh_max = pos - first + bh->b_size;
 
-                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (2) = 0x%zx", bh->b_size);
-                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_blocknr = 0x%llx", (unsigned long long)bh->b_blocknr);
-                                printk(KERN_NOTICE "SEFT: seft_io: bh_max = 0x%llx", (unsigned long long)bh_max);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (2) = 0x%zx ********** while loop\n",
+                                       bh->b_size);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_blocknr = 0x%llx ********** while loop\n",
+                                       (unsigned long long)bh->b_blocknr);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh_max = 0x%llx ********** while loop\n",
+                                       (unsigned long long)bh_max);
 
 			} else {
 				unsigned done = bh->b_size -
 						(bh_max - (pos - first));
+
+                                printk(KERN_NOTICE "SEFT: seft_io: (pos != bh_max) ********** while loop\n");
+
 				bh->b_blocknr += done >> blkbits;
 				bh->b_size -= done;
+
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_size (3) = 0x%zx ********** while loop\n",
+                                       bh->b_size);
+                                printk(KERN_NOTICE "SEFT: seft_io: bh->b_blocknr = 0x%llx ********** while loop\n",
+                                       (unsigned long long)bh->b_blocknr);
 			}
 
 
 			hole = iov_iter_rw(iter) != WRITE && !buffer_written(bh);
 			if (hole) {
+                                printk(KERN_NOTICE "SEFT: seft_io: (hole) ********** while loop\n");
 				addr = NULL;
 				size = bh->b_size - first;
 			} else {
-				//retval = dax_get_addr(bh, &addr, blkbits);
+                                printk(KERN_NOTICE "SEFT: seft_io: (!hole) 1 ********** while loop\n");
 				retval = seft_get_addr(bh, &addr, blkbits);
-				if (retval < 0)
+				if (retval < 0) {
+                                        printk(KERN_NOTICE "SEFT: seft_io: retval (0x%zx) < 0... break... ********** while loop\n",
+                                               retval);
 					break;
+                                }
+
 				if (buffer_unwritten(bh) || buffer_new(bh)) {
-					seft_new_buf(addr, retval, first, pos,
-                                                     end);
-					need_wmb = true;
+                                        printk(KERN_NOTICE "SEFT: seft_io: (buffer_unwritten(bh) || buffer_new(bh)) ********** while loop\n");
+					seft_new_buf(addr, retval, first, pos, end);
+					//need_wmb = true;
 				}
+
 				addr += first;
 				size = retval - first;
+
+                                printk(KERN_NOTICE "SEFT: seft_io: addr = 0x%llx ********** while loop\n",
+                                       (unsigned long long)addr);
+                                printk(KERN_NOTICE "SEFT: seft_io: size = 0x%lx ********** while loop\n",
+                                       size);
 			}
+
 			max = min(pos + size, end);
-		}
+
+                        printk(KERN_NOTICE "SEFT: seft_io: (updated) max = 0x%llx ********** while loop\n",
+                               (unsigned long long)max);
+
+		} else {
+                    printk(KERN_NOTICE "SEFT: seft_io: (pos != max)... no handling ********** while loop\n");
+                }
 
 		if (iov_iter_rw(iter) == WRITE) {
-			len = copy_from_iter_pmem(addr, max - pos, iter);
-			need_wmb = true;
-		} else if (!hole)
-			len = copy_to_iter((void __force *)addr, max - pos,
-					iter);
-		else
-			len = iov_iter_zero(max - pos, iter);
+                        //unsigned char *myAddr = addr;
+                        //int k = 0, limit = 0;
 
-		if (!len)
+                        printk(KERN_NOTICE "SEFT: seft_io: (iov_iter_rw(iter) == WRITE) ********** while loop\n");
+                        printk(KERN_NOTICE "SEFT: seft_io: NEED TO BE HERE... COPYING DATA!!!\n"); 
+
+			len = copy_from_iter(addr, max - pos, iter);
+			//len = copy_from_iter_pmem(addr, max - pos, iter);
+			//need_wmb = true;
+
+                        #if 0
+                        limit = min((size_t)32, len);
+
+                        // RCROBLES_SEFT: Print out first xx bytes of data
+                        printk(KERN_NOTICE "\n*****************************************\n");
+                        printk(KERN_NOTICE "SEFT_RCROBLES: Printing data from addr = 0x%llx\n",
+                               (unsigned long long)myAddr); 
+                        printk(KERN_NOTICE "\t   addr[0] = ");
+                        for (k = 0; k < limit; k++) {
+                            if ((k % 16) == 0) {
+                                printk(KERN_NOTICE "\n");
+                                printk(KERN_NOTICE "\t   addr[16] = ");
+                            }
+                            printk(KERN_NOTICE "\t 0x%x", myAddr[k]); 
+
+                            /* Also copy data to temp buffer */
+                            ray_buf[k] = myAddr[k];
+                        }
+                        printk(KERN_NOTICE "\n*****************************************\n\n");
+                        #endif
+
+
+
+		} else if (!hole) {
+                        printk(KERN_NOTICE "SEFT: seft_io: (!hole) 2 ********** while loop\n");
+			//len = copy_to_iter((void __force *)addr, max - pos, iter);
+			len = copy_to_iter(addr, max - pos, iter);
+                } else {
+                        printk(KERN_NOTICE "SEFT: seft_io: (READ and hole == TRUE) ********** while loop\n");
+                        len = iov_iter_zero(max - pos, iter);
+                }
+
+                printk(KERN_NOTICE "SEFT: seft_io: len = 0x%zx ********** while loop\n", len);
+
+		if (!len) {
+                        printk(KERN_NOTICE "SEFT: seft_io: len = 0... break... ********** while loop\n");
 			break;
+                }
 
 		pos += len;
 		addr += len;
-	}
 
-	if (need_wmb)
-		wmb_pmem();
+                printk(KERN_NOTICE "SEFT: seft_io: (updated)pos = 0x%llx ********** END WHILE LOOP\n",
+                       (unsigned long long)pos);
+                printk(KERN_NOTICE "SEFT: seft_io: (updated)addr = 0x%llx ********** END WHILE LOOP\n",
+                       (unsigned long long)addr);
 
-        printk(KERN_NOTICE "SEFT: seft_io: exiting\n");
+	} /* end while (pos < end) */
+
+	//if (need_wmb) {
+        //        printk(KERN_NOTICE "SEFT: seft_io: (need_wmb)\n");
+	//	wmb_pmem();
+        //}
+
+        printk(KERN_NOTICE "SEFT: seft_io: exiting... returning (pos == start) ? retval : pos - start...\n");
+        printk(KERN_NOTICE "SEFT: seft_io: exiting... returning --> 0x%llx\n",
+               ((pos == start) ? (retval) : (pos - start)));
+
 	return (pos == start) ? retval : pos - start;
 }
 
@@ -293,11 +431,17 @@ ssize_t seft_do_io(struct kiocb *iocb, struct inode *inode,
 	if ((flags & DIO_LOCKING) && iov_iter_rw(iter) == READ)
 		mutex_unlock(&inode->i_mutex);
 
-	if ((retval > 0) && end_io)
+	if ((retval > 0) && end_io) {
+                printk(KERN_NOTICE "SEFT: seft_do_io: calling end_io() function pointer...\n");
 		end_io(iocb, pos, retval, bh.b_private);
+        }
 
-	if (!(flags & DIO_SKIP_DIO_COUNT))
+	if (!(flags & DIO_SKIP_DIO_COUNT)) {
+                printk(KERN_NOTICE "SEFT: seft_do_io: *******************************************\n");
+                printk(KERN_NOTICE "SEFT: seft_do_io: calling inode_dio_end() function pointer...\n");
+                printk(KERN_NOTICE "SEFT: seft_do_io: *******************************************\n");
 		inode_dio_end(inode);
+        }
  out:
         printk(KERN_NOTICE "SEFT: seft_do_io: exiting... retval = 0x%zx\n", retval);
 	return retval;
@@ -342,7 +486,8 @@ static int seft_load_hole(struct address_space *mapping, struct page *page,
 static int copy_user_bh(struct page *to, struct buffer_head *bh,
 			unsigned blkbits, unsigned long vaddr)
 {
-	void __pmem *vfrom;
+	//void __pmem *vfrom;
+	void *vfrom;
 	void *vto;
 
         printk(KERN_NOTICE "SEFT: copy_user_bh: entering");
@@ -363,7 +508,8 @@ static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
 	struct address_space *mapping = inode->i_mapping;
 	sector_t sector = bh->b_blocknr << (inode->i_blkbits - 9);
 	unsigned long vaddr = (unsigned long)vmf->virtual_address;
-	void __pmem *addr;
+	//void __pmem *addr;
+	void *addr;
 	unsigned long pfn;
 	pgoff_t size;
 	int error;
@@ -394,8 +540,9 @@ static int seft_insert_mapping(struct inode *inode, struct buffer_head *bh,
 	}
 
 	if (buffer_unwritten(bh) || buffer_new(bh)) {
-		clear_pmem(addr, PAGE_SIZE);
-		wmb_pmem();
+		//clear_pmem(addr, PAGE_SIZE);
+		//wmb_pmem();
+                clear_page(addr);
 	}
 
 	error = vm_insert_mixed(vma, vaddr, pfn);
@@ -617,7 +764,8 @@ int __seft_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 	unsigned long pmd_addr = address & PMD_MASK;
 	bool write = flags & FAULT_FLAG_WRITE;
 	long length;
-	void __pmem *kaddr;
+	//void __pmem *kaddr;
+	void *kaddr;
 	pgoff_t size, pgoff;
 	sector_t block, sector;
 	unsigned long pfn;
@@ -721,9 +869,13 @@ int __seft_pmd_fault(struct vm_area_struct *vma, unsigned long address,
 
 		if (buffer_unwritten(&bh) || buffer_new(&bh)) {
 			int i;
-			for (i = 0; i < PTRS_PER_PMD; i++)
-				clear_pmem(kaddr + i * PAGE_SIZE, PAGE_SIZE);
-			wmb_pmem();
+			for (i = 0; i < PTRS_PER_PMD; i++) {
+                                //clear_pmem(kaddr + i * PAGE_SIZE, PAGE_SIZE);
+				//clear_pages(kaddr + i * PAGE_SIZE);
+				clear_page(kaddr + i * PAGE_SIZE);
+                        }
+
+			//wmb_pmem();
 			count_vm_event(PGMAJFAULT);
 			mem_cgroup_count_vm_event(vma->vm_mm, PGMAJFAULT);
 			result |= VM_FAULT_MAJOR;
@@ -844,12 +996,15 @@ int seft_zero_page_range(struct inode *inode, loff_t from, unsigned length,
 	if (err < 0)
 		return err;
 	if (buffer_written(&bh)) {
-		void __pmem *addr;
+		//void __pmem *addr;
+		void *addr;
 		err = seft_get_addr(&bh, &addr, inode->i_blkbits);
 		if (err < 0)
 			return err;
-		clear_pmem(addr + offset, length);
-		wmb_pmem();
+
+		clear_page(addr + offset);
+		//clear_pmem(addr + offset, length);
+		//wmb_pmem();
 	}
 
 	return 0;

@@ -98,16 +98,60 @@ static struct fat_floppy_defaults {
 
 static int fat_add_cluster(struct inode *inode)
 {
-	int err, cluster;
+	int err = 0;
+        int cluster = 0;
+        int index = 0;
 
-	err = fat_alloc_clusters(inode, &cluster, 1);
-	if (err)
-		return err;
-	/* FIXME: this cluster should be added after data of this
-	 * cluster is writed */
-	err = fat_chain_add(inode, cluster, 1);
-	if (err)
-		fat_free_clusters(inode, cluster);
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_add_cluster: entering");
+
+        /* For SEFT I/O, need to allocate 4K (2 clusters) */
+        if (IS_SEFT(inode)) {
+            for (index = 0; index < 2; index++) {
+                err = fat_alloc_clusters(inode, &cluster, 1); 
+                if (err) {
+                        fat_msg(inode->i_sb,
+                                KERN_NOTICE,
+                                "SEFT: fat_add_cluster: fat_alloc_clusters failed (1)... exiting... err = 0x%x",
+                                err);
+                        return err;
+                }
+
+                /* FIXME: this cluster should be added after data of this cluster is writed */
+                /* NOTE: After fat_alloc_clusters, the var clusters holds fat_ent.entry value */
+                /* NOTE: After final call to fat_chain_add, inode->i_blocks = 8 */
+                err = fat_chain_add(inode, cluster, 1);
+                if (err) {
+                        fat_msg(inode->i_sb,
+                                KERN_NOTICE,
+                                "SEFT: fat_add_cluster: fat_chain_add failed... err = 0x%x",
+                                err);
+                        fat_free_clusters(inode, cluster);
+                }
+            } /* end for loop*/
+        } else {
+                err = fat_alloc_clusters(inode, &cluster, 1); 
+                if (err) {
+                        fat_msg(inode->i_sb,
+                                KERN_NOTICE,
+                                "SEFT: fat_add_cluster: fat_alloc_clusters failed (2)... exiting... err = 0x%x",
+                                err);
+                        return err;
+                }
+
+                /* FIXME: this cluster should be added after data of this cluster is writed */
+                err = fat_chain_add(inode, cluster, 1);
+                if (err) {
+                        fat_msg(inode->i_sb,
+                                KERN_NOTICE,
+                                "SEFT: fat_add_cluster: fat_chain_add failed... err = 0x%x",
+                                err);
+                        fat_free_clusters(inode, cluster);
+                }
+        }
+
+
+
+        fat_msg(inode->i_sb, KERN_NOTICE, "SEFT: fat_add_cluster: exiting (end of func)... err = 0x%x", err);
 	return err;
 }
 
@@ -122,17 +166,23 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	int err, offset;
 
         fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: entering");
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: iblock = 0x%llx, *max_blocks = 0x%lx",
+                (unsigned long long)iblock, *max_blocks);
 
 	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
-	if (err)
+	if (err) {
 		return err;
+        }
+
 	if (phys) {
 		map_bh(bh_result, sb, phys);
 		*max_blocks = min(mapped_blocks, *max_blocks);
 		return 0;
 	}
-	if (!create)
+
+	if (!create) {
 		return 0;
+        }
 
 	if (iblock != MSDOS_I(inode)->mmu_private >> sb->s_blocksize_bits) {
 		fat_fs_error(sb, "corrupted file size (i_pos %lld, %lld)",
@@ -141,44 +191,69 @@ static inline int __fat_get_block(struct inode *inode, sector_t iblock,
 	}
 
 	offset = (unsigned long)iblock & (sbi->sec_per_clus - 1);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: offset = 0x%x", offset);
+
 	if (!offset) {
+                fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: (1) offset = 0");
+                fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: (1) calling fat_add_cluster");
+
 		/* TODO: multiple cluster allocation would be desirable. */
 		err = fat_add_cluster(inode); 
-		if (err)
+		if (err) {
+                        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: (1) fat_add_cluster returned error = 0x%x", err);
 			return err;
+                }
 	}
 
+	/* Available blocks on this cluster -- sbi->sec_per_clus = 4 */
+        /* For SEFT I/O, 8 blocks will be mapped... 2 clusters */
+        /* After call to fat_add_cluster, inode->i_blocks = 8 */
+        if (IS_SEFT(inode)) {
+                //mapped_blocks = (sbi->sec_per_clus * 2) - offset;  // original
+                //mapped_blocks = inode->i_blocks - offset;  // not sure we can rely on i_blocks
+                mapped_blocks = (sbi->sec_per_clus * 2) - offset; 
+        } else {
+                mapped_blocks = sbi->sec_per_clus - offset; 
+        }
+
+	*max_blocks = min(mapped_blocks, *max_blocks);
+	MSDOS_I(inode)->mmu_private += *max_blocks << sb->s_blocksize_bits;
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: updated mmu_private = 0x%llx",
+                (long long)MSDOS_I(inode)->mmu_private);
+        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: calling fat_bmap");
+
+	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
+	if (err) {
+		return err;
+        }
+
+	BUG_ON(!phys);
+	//BUG_ON(*max_blocks != mapped_blocks);
+
         /* 
-         * SEFT_RCROBLES: Come back and add check for SEFT indoe... is so, then
+         * SEFT_RCROBLES: 
+         *  
+         * Come back and add check for SEFT indoe... is so, then
          * must clear the blocks (initialized) before they are put in tree so 
          * that it's not found by another thread before it's initialized. 
+         *
+         * Also need to add/allcoate the blocks... 
          */
-#if 0
         if (IS_SEFT(inode)) {
             /*
              * Block must be initialized before we put it in the tree so that 
              * it's not found by another thread before it's initialized. 
+             * 
+             * SEFT_RCROBLES: What do we use for the sector parameter???
              */
-            err = seft_clear_blocks(inode, le32_to_cpu(chain[depth-1].key), 1 << inode->i_blkbits);
+            err = seft_clear_blocks(inode, iblock, 1 << inode->i_blkbits);
             if (err) {
+                fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: seft_clear_blocks failed = 0x%x", err);
             }
         }
-#endif
 
-	/* available blocks on this cluster */
-	mapped_blocks = sbi->sec_per_clus - offset;
-
-	*max_blocks = min(mapped_blocks, *max_blocks);
-	MSDOS_I(inode)->mmu_private += *max_blocks << sb->s_blocksize_bits;
-        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: updated mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
-        fat_msg(sb, KERN_NOTICE, "SEFT: __fat_get_block: calling fat_bmap");
-
-	err = fat_bmap(inode, iblock, &phys, &mapped_blocks, create);
-	if (err)
-		return err;
-
-	BUG_ON(!phys);
-	BUG_ON(*max_blocks != mapped_blocks);
 	set_buffer_new(bh_result);
 	map_bh(bh_result, sb, phys);
 

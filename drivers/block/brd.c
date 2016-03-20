@@ -103,7 +103,6 @@ static struct page *brd_insert_page(struct brd_device *brd, sector_t sector)
 	 * restriction might be able to be lifted.
 	 */
 	gfp_flags = GFP_NOIO | __GFP_ZERO;
-//#ifndef CONFIG_BLK_DEV_RAM_DAX && CONFIG_BLK_DEV_RAM_SEFT
 #if !defined(CONFIG_BLK_DEV_RAM_DAX) && !defined(CONFIG_BLK_DEV_RAM_SEFT)
 	gfp_flags |= __GFP_HIGHMEM;
 #endif
@@ -380,13 +379,34 @@ static long brd_direct_access(struct block_device *bdev, sector_t sector,
 	struct brd_device *brd = bdev->bd_disk->private_data;
 	struct page *page;
 
-	if (!brd)
+        printk(KERN_NOTICE "SEFT: brd_direct_access: entering");
+        printk(KERN_NOTICE "SEFT: brd_direct_access: sector = 0x%llx\n", (unsigned long long)sector);
+        printk(KERN_NOTICE "SEFT: brd_direct_access: kaddr = 0x%llx\n", (unsigned long long)kaddr);
+        printk(KERN_NOTICE "SEFT: brd_direct_access: pfn = 0x%llx\n", (unsigned long long)pfn);
+
+	if (!brd) {
+                printk(KERN_NOTICE "SEFT: brd_direct_access: (!brd)... returning -ENODEV (-19)\n");
 		return -ENODEV;
+        }
+
 	page = brd_insert_page(brd, sector);
-	if (!page)
+	if (!page) {
+                printk(KERN_NOTICE "SEFT: brd_direct_access: (!page)... returning -ENOSPC (-28)\n");
 		return -ENOSPC;
+        }
+
 	*kaddr = (void __pmem *)page_address(page);
 	*pfn = page_to_pfn(page);
+
+        printk(KERN_NOTICE "SEFT: brd_direct_access: *pfn = 0x%llx\n",
+               (unsigned long long)*pfn);
+        printk(KERN_NOTICE "SEFT: brd_direct_access: *kaddr = 0x%llx\n",
+               (unsigned long long)*kaddr);
+        //printk(KERN_NOTICE "SEFT: brd_direct_access: **kaddr = 0x%llx\n",
+        //       (unsigned long long)**kaddr);
+        //printk(KERN_NOTICE "SEFT: brd_direct_access: **kaddr = 0x%llx\n",
+        //       (unsigned long long)(*((unsigned long long)*kaddr)));
+        printk(KERN_NOTICE "SEFT: brd_direct_access: exiting... returning PAGE_SIZE\n");
 
 	return PAGE_SIZE;
 }

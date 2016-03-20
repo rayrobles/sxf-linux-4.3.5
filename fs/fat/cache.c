@@ -344,13 +344,13 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 	int cluster, offset;
 
 	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: entering...");
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: inode = 0x%llx", (unsigned long long)inode);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sector = 0x%llx", (unsigned long long)sector);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *phys = 0x%llx", (unsigned long long)*phys);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *mapped_blocks = 0x%lx", *mapped_blocks);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: create = 0x%x... params done", create);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->fat_bits = 0x%x", sbi->fat_bits);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: inode->i_ino = 0x%lx", inode->i_ino);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: inode = 0x%llx", (unsigned long long)inode);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sector = 0x%llx", (unsigned long long)sector);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *phys = 0x%llx", (unsigned long long)*phys);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *mapped_blocks = 0x%lx", *mapped_blocks);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: create = 0x%x... params done", create);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->fat_bits = 0x%x", sbi->fat_bits);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: inode->i_ino = 0x%lx", inode->i_ino);
 
 	*phys = 0;
 	*mapped_blocks = 0;
@@ -362,10 +362,10 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 			fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: updating *phys and *mapped_blocks... sector < dir_entries");
 		}
 
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->dir_entries = 0x%x", sbi->dir_entries);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->dir_per_block_bits = 0x%x", sbi->dir_per_block_bits);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *phys = 0x%llx", (unsigned long long)*phys);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *mapped_blocks = 0x%lx", *mapped_blocks);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->dir_entries = 0x%x", sbi->dir_entries);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->dir_per_block_bits = 0x%x", sbi->dir_per_block_bits);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *phys = 0x%llx", (unsigned long long)*phys);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: *mapped_blocks = 0x%lx", *mapped_blocks);
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: exiting (*phys and *mapped_blocks set)... returning 0");
 
 		return 0;
@@ -385,10 +385,10 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 		 * (caller must hold ->i_mutex)
 		 */
 		last_block = (MSDOS_I(inode)->mmu_private + (blocksize - 1)) >> blocksize_bits;
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: last_block = 0x%llx", (unsigned long long)last_block);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: blocksize = 0x%lx", blocksize);
-		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: blocksize_bits = 0x%x", (unsigned int)blocksize_bits);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: last_block = 0x%llx", (unsigned long long)last_block);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: mmu_private = 0x%llx", (long long)MSDOS_I(inode)->mmu_private);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: blocksize = 0x%lx", blocksize);
+		//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: blocksize_bits = 0x%x", (unsigned int)blocksize_bits);
 		if (sector >= last_block) {
 			fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: exiting after updating last_block (sector >= last_block)... returning 0");
 			return 0;
@@ -398,29 +398,30 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 	cluster = sector >> (sbi->cluster_bits - sb->s_blocksize_bits);
 	offset  = sector & (sbi->sec_per_clus - 1);
 
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->cluster_bits = 0x%x", sbi->cluster_bits);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sb->s_blocksize_bits = 0x%x", sb->s_blocksize_bits);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->sec_per_clus = 0x%x", sbi->sec_per_clus);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: cluster = 0x%llx... before call to fat_bmap_cluster", (unsigned long long)cluster);
-	fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: offset = 0x%llx... before call to fat_bmap_cluster", (unsigned long long)offset);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->cluster_bits = 0x%x", sbi->cluster_bits);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sb->s_blocksize_bits = 0x%x", sb->s_blocksize_bits);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: sbi->sec_per_clus = 0x%x", sbi->sec_per_clus);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: cluster = 0x%llx... before call to fat_bmap_cluster", (unsigned long long)cluster);
+	//fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: offset = 0x%llx... before call to fat_bmap_cluster", (unsigned long long)offset);
 
 	cluster = fat_bmap_cluster(inode, cluster);
 	if (cluster < 0) {
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: exiting (cluster < 0)... cluster = 0x%x", cluster);
 		return cluster;
-	}
-	else if (cluster) {
+	} else if (cluster) {
 
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: calling fat_clus_to_blknr");
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: cluster = 0x%llx", (unsigned long long)cluster);
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: offset = 0x%llx", (unsigned long long)offset);
      
 		*phys = fat_clus_to_blknr(sbi, cluster) + offset;
-		*mapped_blocks = sbi->sec_per_clus - offset;
+		//*mapped_blocks = sbi->sec_per_clus - offset;
+		*mapped_blocks = (sbi->sec_per_clus * 2) - offset;
 
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: (1) *phys = 0x%llx", (unsigned long long)*phys);
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: (1) *mapped_blocks = 0x%lx", *mapped_blocks);
 
+		#if 0
 		/* For SEFT I/O, need to make sure *phys (or LBA) is on 4K boundary */
 		/* NOTE: Might need to put this modifiction inside fat_clus_to_blknr for all SEFT I/O accesses */
                 if (IS_SEFT(inode)) {
@@ -428,6 +429,7 @@ int fat_bmap(struct inode *inode, sector_t sector, sector_t *phys,
 			*phys = ((PAGE_ALIGN(paddr))/512);
 			//*mapped_blocks *= 2; /* double the size we need to map */
                 }
+		#endif
 
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: (2) *phys = 0x%llx", (unsigned long long)*phys);
 		fat_msg(sb, KERN_NOTICE, "SEFT: fat_bmap: (2) *mapped_blocks = 0x%lx", *mapped_blocks);

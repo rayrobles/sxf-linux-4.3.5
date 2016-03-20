@@ -161,6 +161,7 @@ blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
                              NULL, DIO_SKIP_DIO_COUNT);
         } else if (IS_SEFT(inode)) {
             printk(KERN_NOTICE "SEFT: blkdev_direct_IO: calling seft_do_io");
+            //return seft_do_io(iocb, inode, iter, offset, fat_get_block,
             return seft_do_io(iocb, inode, iter, offset, blkdev_get_block,
                               NULL, DIO_SKIP_DIO_COUNT);
         } else {
@@ -488,6 +489,8 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
         }
 
 	sector += get_start_sect(bdev);
+
+#if 0
 	if (sector % (PAGE_SIZE / 512)) {
                 printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: sector mod (PAGE_SIZE / 512)\n");
                 printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx, PAGE_SIZE = 0x%lx\n",
@@ -501,7 +504,14 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
                 printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -EINVAL (-22)\n");
 		return -EINVAL;
         }
+#else
+	if (sector % (PAGE_SIZE / 512)) {
+            printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx, PAGE_SIZE = 0x%lx\n",
+                   (unsigned long long)sector, PAGE_SIZE);
+        }
+#endif
 
+        printk(KERN_NOTICE "SEFT: bdev_direct_access: calling ops->direct_access()\n");
 	avail = ops->direct_access(bdev, sector, addr, pfn);
 	if (!avail) {
                 printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: (!avail)\n");
@@ -1665,7 +1675,7 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct blk_plug plug;
 	ssize_t ret;
 
-        printk(KERN_NOTICE "SEFT: blkdev_write_iter: entering");
+        //printk(KERN_NOTICE "SEFT: blkdev_write_iter: entering\n");
 
 	if (bdev_read_only(I_BDEV(bd_inode)))
 		return -EPERM;
@@ -1688,7 +1698,7 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	}
 	blk_finish_plug(&plug);
 
-        printk(KERN_NOTICE "SEFT: blkdev_write_iter: exiting... ret = 0x%zx", ret);
+        //printk(KERN_NOTICE "SEFT: blkdev_write_iter: exiting... ret = 0x%zx\n", ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(blkdev_write_iter);

@@ -105,6 +105,8 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int ret, new_fclus, last;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: entering");
+
 	/*
 	 * We must locate the last cluster of the file to add this new
 	 * one (new_dclus) to the end of the link list (the FAT).
@@ -114,8 +116,11 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		int fclus, dclus;
 
 		ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
-		if (ret < 0)
+		if (ret < 0) {
+			fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_get_cluster failed... ret = 0x%x", ret);
 			return ret;
+		}
+
 		new_fclus = fclus + 1;
 		last = dclus;
 	}
@@ -131,8 +136,11 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 			ret = fat_ent_write(inode, &fatent, new_dclus, wait);
 			fatent_brelse(&fatent);
 		}
-		if (ret < 0)
+
+		if (ret < 0) {
+			fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_ent_read or fat_ent_write failed...  ret = 0x%x", ret);
 			return ret;
+		}
 		/*
 		 * FIXME:Although we can add this cache, fat_cache_add() is
 		 * assuming to be called after linear search with fat_cache_id.
@@ -147,8 +155,10 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		 */
 		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode)) {
 			ret = fat_sync_inode(inode);
-			if (ret)
+			if (ret) {
+				fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_sync_inode failed...  ret = 0x%x", ret);
 				return ret;
+			}
 		} else
 			mark_inode_dirty(inode);
 	}
@@ -158,7 +168,11 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 			     (llu)(inode->i_blocks >> (sbi->cluster_bits - 9)));
 		fat_cache_inval_inode(inode);
 	}
+
 	inode->i_blocks += nr_cluster << (sbi->cluster_bits - 9);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: inode->i_blocks = 0x%llx", (unsigned long long)inode->i_blocks);
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: exiting... returning 0");
 
 	return 0;
 }

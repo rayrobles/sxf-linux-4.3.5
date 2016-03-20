@@ -470,10 +470,15 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 
 	BUG_ON(nr_cluster > (MAX_BUF_PER_PAGE / 2));	/* fixed limit */
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_clusters: entering");
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_clusters: *cluster = 0x%x, nr_cluster = 0x%x",
+                *cluster, nr_cluster);
+
 	lock_fat(sbi);
 	if (sbi->free_clusters != -1 && sbi->free_clus_valid &&
 	    sbi->free_clusters < nr_cluster) {
 		unlock_fat(sbi);
+                fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_clusters: exiting (1)... err = -ENOSPC (-28)");
 		return -ENOSPC;
 	}
 
@@ -528,6 +533,7 @@ int fat_alloc_clusters(struct inode *inode, int *cluster, int nr_cluster)
 	sbi->free_clus_valid = 1;
 	err = -ENOSPC;
 
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_clusters: could not allocate the free entries");
 out:
 	unlock_fat(sbi);
 	mark_fsinfo_dirty(sb);
@@ -543,6 +549,8 @@ out:
 
 	if (err && idx_clus)
 		fat_free_clusters(inode, cluster[0]);
+
+        fat_msg(sb, KERN_NOTICE, "SEFT: fat_alloc_clusters: exiting... err = 0x%x", err);
 
 	return err;
 }
