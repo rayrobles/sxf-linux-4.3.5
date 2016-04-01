@@ -63,8 +63,6 @@ int fat_clusters_flush(struct super_block *sb)
 	struct buffer_head *bh;
 	struct fat_boot_fsinfo *fsinfo;
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_clusters_flush: entering");
-
 	if (sbi->fat_bits != 32)
 		return 0;
 
@@ -89,9 +87,8 @@ int fat_clusters_flush(struct super_block *sb)
 			fsinfo->next_cluster = cpu_to_le32(sbi->prev_free);
 		mark_buffer_dirty(bh);
 	}
-	brelse(bh);
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_clusters_flush: exiting");
+	brelse(bh);
 	return 0;
 }
 
@@ -105,8 +102,6 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 	struct msdos_sb_info *sbi = MSDOS_SB(sb);
 	int ret, new_fclus, last;
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: entering");
-
 	/*
 	 * We must locate the last cluster of the file to add this new
 	 * one (new_dclus) to the end of the link list (the FAT).
@@ -117,7 +112,6 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 
 		ret = fat_get_cluster(inode, FAT_ENT_EOF, &fclus, &dclus);
 		if (ret < 0) {
-			fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_get_cluster failed... ret = 0x%x", ret);
 			return ret;
 		}
 
@@ -138,7 +132,6 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		}
 
 		if (ret < 0) {
-			fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_ent_read or fat_ent_write failed...  ret = 0x%x", ret);
 			return ret;
 		}
 		/*
@@ -156,7 +149,6 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 		if (S_ISDIR(inode->i_mode) && IS_DIRSYNC(inode)) {
 			ret = fat_sync_inode(inode);
 			if (ret) {
-				fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: fat_sync_inode failed...  ret = 0x%x", ret);
 				return ret;
 			}
 		} else
@@ -170,9 +162,6 @@ int fat_chain_add(struct inode *inode, int new_dclus, int nr_cluster)
 	}
 
 	inode->i_blocks += nr_cluster << (sbi->cluster_bits - 9);
-
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: inode->i_blocks = 0x%llx", (unsigned long long)inode->i_blocks);
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_chain_add: exiting... returning 0");
 
 	return 0;
 }
