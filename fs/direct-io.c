@@ -906,8 +906,6 @@ static int do_direct_IO(struct dio *dio, struct dio_submit *sdio,
 	const unsigned blkbits = sdio->blkbits;
 	int ret = 0;
 
-        printk(KERN_NOTICE "SEFT: do_direct_IO: entering");
-
 	while (sdio->block_in_file < sdio->final_block_in_request) {
 		struct page *page;
 		size_t from, to;
@@ -1048,7 +1046,6 @@ next_block:
 		page_cache_release(page);
 	}
 out:
-        printk(KERN_NOTICE "SEFT: do_direct_IO: exiting... ret = 0x%x", ret);
 	return ret;
 }
 
@@ -1121,8 +1118,6 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 	 * Avoid references to bdev if not absolutely needed to give
 	 * the early prefetch in the caller enough time.
 	 */
-
-        printk(KERN_NOTICE "SEFT: do_blockdev_direct_IO: entering");
 
 	if (align & blocksize_mask) {
 		if (bdev)
@@ -1248,7 +1243,6 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 
 	blk_start_plug(&plug);
 
-        printk(KERN_NOTICE "SEFT: do_blockdev_direct_IO: calling do_direct_io");
 	retval = do_direct_IO(dio, &sdio, &map_bh);
 	if (retval)
 		dio_cleanup(dio, &sdio);
@@ -1314,7 +1308,6 @@ do_blockdev_direct_IO(struct kiocb *iocb, struct inode *inode,
 		BUG_ON(retval != -EIOCBQUEUED);
 
 out:
-        printk(KERN_NOTICE "SEFT: do_blockdev_direct_IO: exiting... retval = 0x%zx", retval);
 	return retval;
 }
 

@@ -27,7 +27,6 @@ static long do_sys_name_to_handle(struct path *path,
 	 */
 	if (!path->dentry->d_sb->s_export_op ||
 	    !path->dentry->d_sb->s_export_op->fh_to_dentry) {
-		printk(KERN_NOTICE "SEFT: do_tmpfile: AM I HERE (2)??? *******************************************************");
 		return -EOPNOTSUPP;
 	}
 

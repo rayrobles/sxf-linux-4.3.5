@@ -240,7 +240,6 @@ int swap_writepage(struct page *page, struct writeback_control *wbc)
 		goto out;
 	}
 
-        printk(KERN_NOTICE "SEFT: swap_writepage: calling __swap_writepage");
 	ret = __swap_writepage(page, wbc, end_swap_bio_write);
 out:
 	return ret;
@@ -294,7 +293,6 @@ int __swap_writepage(struct page *page, struct writeback_control *wbc,
 			ClearPageReclaim(page);
 			pr_err_ratelimited("Write error on dio swapfile (%Lu)\n",
 				page_file_offset(page));
-			printk(KERN_NOTICE "SEFT: __swap_writepage: ret = 0... buffers not allocated.......................");
 		}
 		end_page_writeback(page);
 		return ret;

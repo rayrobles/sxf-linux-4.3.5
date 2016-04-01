@@ -44,7 +44,6 @@ static const struct vm_operations_struct fat_seft_vm_ops = {
 
 static int seft_file_mmap(struct file *file, struct vm_area_struct *vma)
 {
-        fat_msg(file->f_mapping->host->i_sb, KERN_NOTICE, "SEFT: seft_file_mmap: entering");
 	if (!IS_SEFT(file_inode(file)))
 		return generic_file_mmap(file, vma);
 
@@ -52,11 +51,9 @@ static int seft_file_mmap(struct file *file, struct vm_area_struct *vma)
 	vma->vm_ops = &fat_seft_vm_ops;
 	vma->vm_flags |= VM_MIXEDMAP | VM_HUGEPAGE;
 	//vma->vm_flags |= VM_MIXEDMAP;
-        fat_msg(file->f_mapping->host->i_sb, KERN_NOTICE, "SEFT: seft_file_mmap: exiting");
 	return 0;
 }
 #else
-//#define ext2_file_mmap	generic_file_mmap
 #define seft_file_mmap	generic_file_mmap
 #endif
 
@@ -208,18 +205,10 @@ int fat_file_fsync(struct file *filp, loff_t start, loff_t end, int datasync)
 	return res ? res : err;
 }
 
-/* 
- * SEFT_RCROBLES: DAX changes read/write pointers to xip_file read
- * and xip_file_write... for SEFT, do we need specific file read and 
- * write functions??? 
- */ 
 const struct file_operations fat_file_operations = {
 	.llseek		= generic_file_llseek,
-//        .read           = new_sync_read,
-//        .write          = new_sync_write,
         .read_iter	= generic_file_read_iter,
         .write_iter	= generic_file_write_iter,
-//	.mmap		= generic_file_mmap,
 	.mmap		= seft_file_mmap,
 	.release	= fat_file_release,
 	.unlocked_ioctl	= fat_generic_ioctl,
@@ -271,8 +260,6 @@ static int fat_free(struct inode *inode, int skip)
 {
 	struct super_block *sb = inode->i_sb;
 	int err, wait, free_start, i_start, i_logstart;
-
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_free: entering");
 
 	if (MSDOS_I(inode)->i_start == 0)
 		return 0;
@@ -335,7 +322,6 @@ static int fat_free(struct inode *inode, int skip)
 	inode->i_blocks = skip << (MSDOS_SB(sb)->cluster_bits - 9);
 
 	/* Freeing the remained cluster chain */
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_free: exiting... after calling fat_free_clusters");
 	return fat_free_clusters(inode, free_start);
 }
 
@@ -344,8 +330,6 @@ void fat_truncate_blocks(struct inode *inode, loff_t offset)
 	struct msdos_sb_info *sbi = MSDOS_SB(inode->i_sb);
 	const unsigned int cluster_size = sbi->cluster_size;
 	int nr_clusters;
-
-        printk(KERN_NOTICE "SEFT: fat_truncate_blocks: entering");
 
 	/*
 	 * This protects against truncating a file bigger than it was then
@@ -358,13 +342,11 @@ void fat_truncate_blocks(struct inode *inode, loff_t offset)
 
 	fat_free(inode, nr_clusters);
 	fat_flush_inodes(inode->i_sb, inode, NULL);
-        printk(KERN_NOTICE "SEFT: fat_truncate_blocks: exiting");
 }
 
 int fat_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 {
 	struct inode *inode = d_inode(dentry);
-        printk(KERN_NOTICE "SEFT: fat_getattr: entering");
 	generic_fillattr(inode, stat);
 	stat->blksize = MSDOS_SB(inode->i_sb)->cluster_size;
 
@@ -372,7 +354,6 @@ int fat_getattr(struct vfsmount *mnt, struct dentry *dentry, struct kstat *stat)
 		/* Use i_pos for ino. This is used as fileid of nfs. */
 		stat->ino = fat_i_pos_read(MSDOS_SB(inode->i_sb), inode);
 	}
-        printk(KERN_NOTICE "SEFT: fat_getattr: exiting\n");
 	return 0;
 }
 EXPORT_SYMBOL_GPL(fat_getattr);
@@ -440,8 +421,6 @@ int fat_setattr(struct dentry *dentry, struct iattr *attr)
 	struct inode *inode = d_inode(dentry);
 	unsigned int ia_valid;
 	int error;
-
-        printk(KERN_NOTICE "SEFT: fat_setattr: entering");
 
 	/* Check for setting the inode time. */
 	ia_valid = attr->ia_valid;
@@ -511,7 +490,6 @@ int fat_setattr(struct dentry *dentry, struct iattr *attr)
 	setattr_copy(inode, attr);
 	mark_inode_dirty(inode);
 out:
-        printk(KERN_NOTICE "SEFT: fat_setattr: exiting");
 	return error;
 }
 EXPORT_SYMBOL_GPL(fat_setattr);

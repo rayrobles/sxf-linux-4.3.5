@@ -2653,8 +2653,6 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	if (error)
 		return error;
 
-        printk(KERN_NOTICE "SEFT: vfs_create: entering");
-
 	if (!dir->i_op->create)
 		return -EACCES;	/* shouldn't it be ENOSYS? */
 	mode &= S_IALLUGO;
@@ -2663,12 +2661,10 @@ int vfs_create(struct inode *dir, struct dentry *dentry, umode_t mode,
 	if (error)
 		return error;
 
-        printk(KERN_NOTICE "SEFT: vfs_create: calling dir->i_op->create");
 	error = dir->i_op->create(dir, dentry, mode, want_excl);
 	if (!error)
 		fsnotify_create(dir, dentry);
 
-        printk(KERN_NOTICE "SEFT: vfs_create: exiting");
 	return error;
 }
 EXPORT_SYMBOL(vfs_create);
@@ -3006,7 +3002,6 @@ static int lookup_open(struct nameidata *nd, struct path *path,
 		if (error)
 			goto out_dput;
 
-                printk(KERN_NOTICE "SEFT: lookup_open: calling vfs_create");
 		error = vfs_create(dir->d_inode, dentry, mode,
 				   nd->flags & LOOKUP_EXCL);
 		if (error)
@@ -3270,7 +3265,6 @@ static int do_tmpfile(struct nameidata *nd, unsigned flags,
 	if (error)
 		goto out2;
 	if (!dir->i_op->tmpfile) {
-            printk(KERN_NOTICE "SEFT: do_tmpfile: AM I HERE (1)??? *******************************************************");
 		error = -EOPNOTSUPP;
 		goto out2;
 	}
@@ -3569,7 +3563,6 @@ retry:
 		goto out;
 	switch (mode & S_IFMT) {
 		case 0: case S_IFREG:
-                        printk(KERN_NOTICE "SEFT: SYSCALL_DEFINE4(mknod...): calling vfs_create");
 			error = vfs_create(path.dentry->d_inode,dentry,mode,true);
 			break;
 		case S_IFCHR: case S_IFBLK:

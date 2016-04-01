@@ -161,7 +161,6 @@ blkdev_direct_IO(struct kiocb *iocb, struct iov_iter *iter, loff_t offset)
                              NULL, DIO_SKIP_DIO_COUNT);
         } else if (IS_SEFT(inode)) {
             printk(KERN_NOTICE "SEFT: blkdev_direct_IO: calling seft_do_io");
-            //return seft_do_io(iocb, inode, iter, offset, fat_get_block,
             return seft_do_io(iocb, inode, iter, offset, blkdev_get_block,
                               NULL, DIO_SKIP_DIO_COUNT);
         } else {
@@ -392,7 +391,6 @@ int bdev_read_page(struct block_device *bdev, sector_t sector,
 {
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
 	if (!ops->rw_page || bdev_get_integrity(bdev)) {
-                printk(KERN_NOTICE "SEFT: bdev_read_page: AM I HERE (4)??? *******************************************************");
 		return -EOPNOTSUPP;
         }
 	return ops->rw_page(bdev, sector + get_start_sect(bdev), page, READ);
@@ -425,7 +423,6 @@ int bdev_write_page(struct block_device *bdev, sector_t sector,
 	int rw = (wbc->sync_mode == WB_SYNC_ALL) ? WRITE_SYNC : WRITE;
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
 	if (!ops->rw_page || bdev_get_integrity(bdev)) {
-                printk(KERN_NOTICE "SEFT: bdev_write_page: AM I HERE (5)??? *******************************************************");
 		return -EOPNOTSUPP;
         }
 	set_page_writeback(page);
@@ -461,8 +458,6 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
 	long avail;
 	const struct block_device_operations *ops = bdev->bd_disk->fops;
 
-        printk(KERN_NOTICE "SEFT: bdev_direct_access: entering");
-
 	/*
 	 * The device driver is allowed to sleep, in order to make the
 	 * memory directly accessible.
@@ -472,54 +467,25 @@ long bdev_direct_access(struct block_device *bdev, sector_t sector,
 	if (size < 0)
 		return size;
 	if (!ops->direct_access) {
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: block_device_operations does not support direct_access\n");
 		return -EOPNOTSUPP;
         }
 
 	if ((sector + DIV_ROUND_UP(size, 512)) > part_nr_sects_read(bdev->bd_part)) {
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: sector (rounded up) > part_nr_sects_read\n");
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx\n",
-                       (unsigned long long)sector);
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: DIV_ROUND_UP(size, 512) = 0x%lx\n",
-                       DIV_ROUND_UP(size, 512));
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: part_nr_sects_read(bdev->bd_part) = 0x%llx\n",
-                       (unsigned long long)part_nr_sects_read(bdev->bd_part));
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -ERANGE (-34)\n");
 		return -ERANGE;
         }
 
 	sector += get_start_sect(bdev);
 
-#if 0
 	if (sector % (PAGE_SIZE / 512)) {
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: sector mod (PAGE_SIZE / 512)\n");
                 printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx, PAGE_SIZE = 0x%lx\n",
                        (unsigned long long)sector, PAGE_SIZE);
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: get_start_sect(bdev) = 0x%llx\n",
-                       (unsigned long long)get_start_sect(bdev));
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: part_nr_sects_read(bdev) = 0x%llx\n",
-                       (unsigned long long)part_nr_sects_read(bdev->bd_part));
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: *addr 0x%llx, *pfn 0x%lx, size 0x%lx\n",
-                       (unsigned long long)*addr, *pfn, size);
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -EINVAL (-22)\n");
-		return -EINVAL;
         }
-#else
-	if (sector % (PAGE_SIZE / 512)) {
-            printk(KERN_NOTICE "SEFT: bdev_direct_access: sector = 0x%llx, PAGE_SIZE = 0x%lx\n",
-                   (unsigned long long)sector, PAGE_SIZE);
-        }
-#endif
 
-        printk(KERN_NOTICE "SEFT: bdev_direct_access: calling ops->direct_access()\n");
 	avail = ops->direct_access(bdev, sector, addr, pfn);
 	if (!avail) {
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: ERROR: (!avail)\n");
-                printk(KERN_NOTICE "SEFT: bdev_direct_access: exiting... -ERANGE (-34)\n");
 		return -ERANGE;
         }
 
-        printk(KERN_NOTICE "SEFT: bdev_direct_access: returning... min(avail, size) = 0x%lx\n", min(avail, size));
 	return min(avail, size);
 }
 EXPORT_SYMBOL_GPL(bdev_direct_access);
@@ -535,12 +501,9 @@ static struct inode *bdev_alloc_inode(struct super_block *sb)
 {
 	struct bdev_inode *ei = kmem_cache_alloc(bdev_cachep, GFP_KERNEL);
 
-        printk(KERN_NOTICE "SEFT: bdev_alloc_inode: entering");
-
 	if (!ei)
 		return NULL;
 
-        printk(KERN_NOTICE "SEFT: bdev_alloc_inode: exiting");
 	return &ei->vfs_inode;
 }
 
@@ -1675,8 +1638,6 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	struct blk_plug plug;
 	ssize_t ret;
 
-        //printk(KERN_NOTICE "SEFT: blkdev_write_iter: entering\n");
-
 	if (bdev_read_only(I_BDEV(bd_inode)))
 		return -EPERM;
 
@@ -1698,7 +1659,6 @@ ssize_t blkdev_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	}
 	blk_finish_plug(&plug);
 
-        //printk(KERN_NOTICE "SEFT: blkdev_write_iter: exiting... ret = 0x%zx\n", ret);
 	return ret;
 }
 EXPORT_SYMBOL_GPL(blkdev_write_iter);

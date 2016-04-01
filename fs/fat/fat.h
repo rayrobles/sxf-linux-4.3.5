@@ -363,7 +363,6 @@ extern long fat_generic_ioctl(struct file *filp, unsigned int cmd,
 
 
 extern const struct file_operations fat_file_operations;
-//extern const struct file_operations fat_seft_file_operations;
 
 
 extern const struct inode_operations fat_file_inode_operations;

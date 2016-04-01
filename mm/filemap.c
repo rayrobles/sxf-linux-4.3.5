@@ -440,7 +440,6 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 {
 	int err = 0;
 
-        printk(KERN_NOTICE "SEFT: filemap_write_and_wait_range: entering\n");
 	if (mapping->nrpages) {
 		err = __filemap_fdatawrite_range(mapping, lstart, lend,
 						 WB_SYNC_ALL);
@@ -455,7 +454,6 @@ int filemap_write_and_wait_range(struct address_space *mapping,
 		err = filemap_check_errors(mapping);
 	}
 
-        printk(KERN_NOTICE "SEFT: filemap_write_and_wait_range: exiting... err = 0x%x\n", err);
 	return err;
 }
 EXPORT_SYMBOL(filemap_write_and_wait_range);
@@ -1722,13 +1720,6 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 	loff_t *ppos = &iocb->ki_pos;
 	loff_t pos = *ppos;
 
-        /* 
-         * SEFT_RCROBLES: There is supposed to be a change here for checking
-         * for direct IO (via io_is_direct(file)... although it appears that 
-         * change is now gone in lieu of the IOCB_DIRECT flag being checked 
-         * on the iocb. Come back and check to see if we need use the macro.
-         */
-        //if (io_is_direct(file)) {
         if (iocb->ki_flags & IOCB_DIRECT) {
 		struct address_space *mapping = file->f_mapping;
 		struct inode *inode = mapping->host;
@@ -1737,21 +1728,20 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 
 		if (!count)
 			goto out; /* skip atime */
+
 		size = i_size_read(inode);
 		retval = filemap_write_and_wait_range(mapping, pos,
 					pos + count - 1);
+
 		if (!retval) {
 			struct iov_iter data = *iter;
-                        //printk(KERN_NOTICE "SEFT: generic_file_read_iter: calling mapping->a_ops->direct_IO");
 			retval = mapping->a_ops->direct_IO(iocb, &data, pos);
 		}
 
 		if (retval > 0) {
 			*ppos = pos + retval;
 			iov_iter_advance(iter, retval);
-		} else {
-                    //printk(KERN_NOTICE "SEFT: generic_file_read_iter: retval <= 0 after .direct_IO (0x%zx)", retval);
-                }
+		}
 
 		/*
 		 * Btrfs can have a short DIO read if we encounter
@@ -1760,21 +1750,12 @@ generic_file_read_iter(struct kiocb *iocb, struct iov_iter *iter)
 		 * there was a short read because we hit EOF, go ahead
 		 * and return.  Otherwise fallthrough to buffered io for
 		 * the rest of the read.  Buffered reads will not work for
-		 * DAX files, so don't bother trying.
-                 *
-                 * SEFT_RCROBLES: Buffered reads won't work for SEFT files
+		 * SEFT files, so don't bother trying.
 		 */
-//		if (retval < 0 || !iov_iter_count(iter) || *ppos >= size ||
-//		    IS_DAX(inode)) {
 		if (retval < 0 || !iov_iter_count(iter) || *ppos >= size ||
                     IS_DAX(inode) || IS_SEFT(inode)) {
 			file_accessed(file);
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: file accessed called after call to .direct_IO");
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: retval =  0x%zx", retval);
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: iov_iter_count(iter) = 0x%zx", iov_iter_count(iter));
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: *ppos = 0x%llx", (long long)*ppos);
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: size = 0x%llx", (long long)size);
-                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: skipping buffered write call to do_generic_file_read");
+                        printk(KERN_NOTICE "SEFT: generic_file_read_iter: do not perform buffered read\n");
 			goto out;
 		}
 	}
@@ -2390,8 +2371,6 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos)
 	pgoff_t		end;
 	struct iov_iter data;
 
-        printk(KERN_NOTICE "SEFT: generic_file_direct_write: entering\n");
-
 	write_len = iov_iter_count(from);
 	end = (pos + write_len - 1) >> PAGE_CACHE_SHIFT;
 
@@ -2448,7 +2427,6 @@ generic_file_direct_write(struct kiocb *iocb, struct iov_iter *from, loff_t pos)
             printk(KERN_NOTICE "SEFT: generic_file_read_iter: written <= 0 after .direct_IO (0x%zx)\n", written);
         }
 out:
-        printk(KERN_NOTICE "SEFT: generic_file_direct_write: exiting... written = 0x%zx\n", written);
 	return written;
 }
 EXPORT_SYMBOL(generic_file_direct_write);
@@ -2497,7 +2475,6 @@ ssize_t generic_perform_write(struct file *file,
 		size_t copied;		/* Bytes copied from user */
 		void *fsdata;
 
-                //printk(KERN_NOTICE "SEFT: generic_perform_write: do-while loop...........................");
 		offset = (pos & (PAGE_CACHE_SIZE - 1));
 		bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
 						iov_iter_count(i));
@@ -2523,9 +2500,9 @@ again:
 			break;
 		}
 
-                //printk(KERN_NOTICE "SEFT: generic_perform_write: calling a_ops->write_begin");
 		status = a_ops->write_begin(file, mapping, pos, bytes, flags,
 						&page, &fsdata);
+
 		if (unlikely(status < 0))
 			break;
 
@@ -2535,7 +2512,6 @@ again:
 		copied = iov_iter_copy_from_user_atomic(page, i, offset, bytes);
 		flush_dcache_page(page);
 
-                //printk(KERN_NOTICE "SEFT: generic_perform_write: calling a_ops->write_end");
 		status = a_ops->write_end(file, mapping, pos, bytes, copied,
 						page, fsdata);
 		if (unlikely(status < 0))
@@ -2556,8 +2532,6 @@ again:
 			 */
 			bytes = min_t(unsigned long, PAGE_CACHE_SIZE - offset,
 						iov_iter_single_seg_count(i));
-
-                        //printk(KERN_NOTICE "SEFT: generic_perform_write: unable to copy... goto again.................... no bueno!!!!!!!!!!");
 			goto again;
 		}
 		pos += copied;
@@ -2606,32 +2580,20 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 	if (err)
 		goto out;
 
-        /* 
-         * SEFT_RCROBLES: There is supposed to be a change here for checking
-         * for direct IO (via io_is_direct(file)... although it appears that 
-         * change is now gone in lieu of the IOCB_DIRECT flag being checked 
-         * on the iocb. Come back and check to see if we need use the macro.
-         */
-        //if (io_is_direct(file)) {
 	if (iocb->ki_flags & IOCB_DIRECT) {
 		loff_t pos, endbyte;
 
-                printk(KERN_NOTICE "SEFT: __generic_file_write_iter: IOCB_DIRECT set for iocb");
-
 		written = generic_file_direct_write(iocb, from, iocb->ki_pos);
+
 		/*
 		 * If the write stopped short of completing, fall back to
 		 * buffered writes.  Some filesystems do this for writes to
-		 * holes, for example.  For DAX files, a buffered write will
-		 * not succeed (even if it did, DAX does not handle dirty
+		 * holes, for example.  For SEFT files, a buffered write will
+		 * not succeed (even if it did, SEFT does not handle dirty
 		 * page-cache pages correctly).
-                 * 
-                 * SEFT_RCROBLES: Do not fall back to buffered write for writes 
-                 * that stopped short of completing. 
 		 */
-//		if (written < 0 || !iov_iter_count(from) || IS_DAX(inode))
 		if (written < 0 || !iov_iter_count(from) || IS_DAX(inode) || IS_SEFT(inode)) {
-                        printk(KERN_NOTICE "SEFT: __generic_file_write_iter: SEFT inode detected... exiting after call to generic_file_direct_write to not do buffered write");
+                        printk(KERN_NOTICE "SEFT: __generic_file_write_iter: do not performed buffered write\n");
 			goto out;
                 }
 
@@ -2667,8 +2629,6 @@ ssize_t __generic_file_write_iter(struct kiocb *iocb, struct iov_iter *from)
 			 */
 		}
 	} else {
-                //printk(KERN_NOTICE "SEFT: __generic_file_write_iter: IOCB_DIRECT not set for iocb");
-
 		written = generic_perform_write(file, from, iocb->ki_pos);
 		if (likely(written > 0))
 			iocb->ki_pos += written;

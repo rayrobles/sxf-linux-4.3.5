@@ -1197,8 +1197,6 @@ static int fat_add_new_entries(struct inode *dir, void *slots, int nr_slots,
 	unsigned long size, copy;
 	int err, i, n, offset, cluster[2];
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_new_entries: entering");
-
 	/*
 	 * The minimum cluster size is 512bytes, and maximum entry
 	 * size is 32*slots (672bytes).  So, iff the cluster size is
@@ -1254,7 +1252,6 @@ static int fat_add_new_entries(struct inode *dir, void *slots, int nr_slots,
 	if (err)
 		goto error_free;
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_new_entries: exiting... no error... cluster[0] = 0x%x", cluster[0]);
 	return cluster[0];
 
 error_free:
@@ -1266,7 +1263,6 @@ error_nomem:
 		bforget(bhs[i]);
 	fat_free_clusters(dir, cluster[0]);
 error:
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_new_entries: exiting... with error = 0x%x", err);
 	return err;
 }
 
@@ -1280,7 +1276,6 @@ int fat_add_entries(struct inode *dir, void *slots, int nr_slots,
 	int err, free_slots, i, nr_bhs;
 	loff_t pos, i_pos;
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: entering");
 	sinfo->nr_slots = nr_slots;
 
 	/* First stage: search free directory entries */
@@ -1358,12 +1353,8 @@ found:
 			goto error_remove;
 	}
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: nr_slots = 0x%x", nr_slots);
-
 	if (nr_slots) {
 		int cluster, nr_cluster;
-
-                fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: allocating cluster for new entries");
 
 		/*
 		 * Third stage: allocate the cluster for new entries.
@@ -1387,30 +1378,21 @@ found:
 				& ~((loff_t)sbi->cluster_size - 1);
 		}
 
-                fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: nr_cluster = 0x%x", nr_cluster);
-                fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: sbi->cluster_bits = 0x%x", sbi->cluster_bits);
-
 		dir->i_size += nr_cluster << sbi->cluster_bits;
-                fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: dir->i_size = 0x%llx", dir->i_size);
-
 		MSDOS_I(dir)->mmu_private += nr_cluster << sbi->cluster_bits;
-                fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: MSDOS_I(dir)->mmu_private = 0x%llx", MSDOS_I(dir)->mmu_private);
-
 	}
+
 	sinfo->slot_off = pos;
 	sinfo->de = de;
 	sinfo->bh = bh;
 	sinfo->i_pos = fat_make_i_pos(sb, sinfo->bh, sinfo->de);
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: exiting... no error");
 	return 0;
-
 error:
 	brelse(bh);
 	for (i = 0; i < nr_bhs; i++)
 		brelse(bhs[i]);
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: exiting... error = 0x%x", err);
 	return err;
 
 error_remove:
@@ -1418,7 +1400,6 @@ error_remove:
 	if (free_slots)
 		__fat_remove_entries(dir, pos, free_slots);
 
-        fat_msg(sb, KERN_NOTICE, "SEFT: fat_add_entries: exiting... error_remove = 0x%x", err);
 	return err;
 }
 EXPORT_SYMBOL_GPL(fat_add_entries);

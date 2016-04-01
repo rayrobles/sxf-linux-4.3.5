@@ -896,7 +896,6 @@ static int zswap_writeback_entry(struct zpool *pool, unsigned long handle)
 	SetPageReclaim(page);
 
 	/* start writeback */
-        printk(KERN_NOTICE "SEFT: zswap_writeback_entry: calling __swap_writepage");
 	__swap_writepage(page, &wbc, end_swap_bio_write);
 	page_cache_release(page);
 	zswap_written_back_pages++;

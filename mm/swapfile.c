@@ -152,7 +152,6 @@ static int discard_swap(struct swap_info_struct *si)
 		cond_resched();
 	}
 
-	printk(KERN_NOTICE "SEFT: discard_swat: AM I HERE (3)??? *******************************************************");
 	return err;		/* That will often be -EOPNOTSUPP */
 }
 
